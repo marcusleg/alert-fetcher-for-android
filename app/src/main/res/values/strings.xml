@@ -23,8 +23,8 @@
 
     <string name="notification_resolved_title">Resolved: %1$s</string>
     <plurals name="summary_firing">
-        <item quantity="one">%1$d alert</item>
-        <item quantity="other">%1$d alerts</item>
+        <item quantity="one">%1$d firing alert</item>
+        <item quantity="other">%1$d firing alerts</item>
     </plurals>
     <plurals name="summary_resolved">
         <item quantity="one">%1$d resolved</item>

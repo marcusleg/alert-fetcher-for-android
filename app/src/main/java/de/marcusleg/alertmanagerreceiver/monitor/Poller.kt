@@ -33,6 +33,9 @@ class Poller(
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     private val mutex = Mutex()
+
+    /** Notifications don't survive a reboot or app update; the first check of a process restores them. */
+    private var restoreNotifications = true
     private val _polling = MutableStateFlow(false)
     val polling: StateFlow<Boolean> = _polling.asStateFlow()
 
@@ -45,7 +48,8 @@ class Poller(
         try {
             val alerts = api.alerts(settings)
             val result = alertRepository.sync(alerts, settings, startedAt)
-            notifier.handle(result.updates, settings)
+            notifier.handle(result.updates, settings, restoreMissing = restoreNotifications)
+            restoreNotifications = false
             var outcome: HealthOutcome? = null
             settingsRepository.updateMonitorState { state ->
                 Health.onSuccess(state, settings, clock(), result.heartbeatSeen).also { outcome = it }.state

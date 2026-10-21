@@ -73,8 +73,13 @@ class AlertNotifier(private val context: Context) {
         Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
 
-    fun handle(updates: List<AlertUpdate>, settings: AppSettings) {
+    /**
+     * Updates notifications for the changes of one check. With [restoreMissing], still-firing alerts whose
+     * notification is gone (cleared by a reboot or app update) are posted again, silently.
+     */
+    fun handle(updates: List<AlertUpdate>, settings: AppSettings, restoreMissing: Boolean = false) {
         if (updates.isEmpty()) return
+        val visible = if (restoreMissing) activeAlertNotifications().mapNotNull { it.tag }.toSet() else emptySet()
         var changed = false
         for ((alert, change) in updates) {
             val wanted = alert.severity.isAtLeast(settings.minNotifySeverity)
@@ -82,7 +87,12 @@ class AlertNotifier(private val context: Context) {
                 AlertChange.NEW_FIRING, AlertChange.REFIRED, AlertChange.UNSUPPRESSED ->
                     if (wanted) showFiring(alert, settings).also { changed = true }
                 // Unchanged; leave a swiped-away notification dismissed.
-                AlertChange.STILL_FIRING, AlertChange.STILL_SUPPRESSED -> Unit
+                AlertChange.STILL_FIRING ->
+                    if (restoreMissing && wanted && !alert.acknowledged && alert.fingerprint !in visible) {
+                        showFiring(alert, settings, silent = true)
+                        changed = true
+                    }
+                AlertChange.STILL_SUPPRESSED -> Unit
                 AlertChange.SUPPRESSED, AlertChange.RESOLVED_QUIETLY -> {
                     manager.cancel(alert.fingerprint, ID_ALERT)
                     changed = true
@@ -97,13 +107,14 @@ class AlertNotifier(private val context: Context) {
     }
 
     @SuppressLint("MissingPermission")
-    fun showFiring(alert: AlertEntity, settings: AppSettings) {
+    fun showFiring(alert: AlertEntity, settings: AppSettings, silent: Boolean = false) {
         if (!canPost()) return
         val builder = baseBuilder(alert, channelFor(alert.severity))
             .setContentTitle(alert.alertName)
             .setCategory(NotificationCompat.CATEGORY_ERROR)
             .setPriority(if (alert.severity == Severity.INFO) NotificationCompat.PRIORITY_DEFAULT else NotificationCompat.PRIORITY_HIGH)
             .setWhen(alert.startsAt ?: alert.firstSeenAt)
+            .setSilent(silent)
             .addAction(
                 R.drawable.ic_stat_check,
                 context.getString(R.string.action_acknowledge),
@@ -116,7 +127,7 @@ class AlertNotifier(private val context: Context) {
                 NotificationActionReceiver.intent(context, NotificationActionReceiver.ACTION_SILENCE, alert.fingerprint),
             )
         }
-        manager.notify(alert.fingerprint, ID_ALERT, builder.build())
+        postFresh(alert.fingerprint, ID_ALERT, builder.build())
     }
 
     @SuppressLint("MissingPermission")
@@ -130,7 +141,7 @@ class AlertNotifier(private val context: Context) {
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setWhen(alert.endsAt ?: alert.statusChangedAt)
             .setTimeoutAfter(RESOLVED_TIMEOUT_MS)
-        manager.notify(alert.fingerprint, ID_ALERT, builder.build())
+        postFresh(alert.fingerprint, ID_ALERT, builder.build())
     }
 
     private fun baseBuilder(alert: AlertEntity, channel: String): NotificationCompat.Builder {
@@ -152,6 +163,17 @@ class AlertNotifier(private val context: Context) {
             .setGroup(GROUP_KEY)
             .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
             .setContentIntent(openAlertIntent(alert.fingerprint))
+    }
+
+    /**
+     * Android drops *updates* of existing notifications when an app posts more than ~5 per second, which
+     * happens when many alerts change in one check. New notifications are never dropped, so state changes
+     * replace the old notification instead of updating it.
+     */
+    @SuppressLint("MissingPermission")
+    private fun postFresh(tag: String?, id: Int, notification: Notification) {
+        manager.cancel(tag, id)
+        manager.notify(tag, id, notification)
     }
 
     fun cancel(fingerprint: String) {
@@ -178,12 +200,13 @@ class AlertNotifier(private val context: Context) {
         }
         val resolved = active.count { it.notification.channelId == CHANNEL_RESOLVED }
         val firing = active.size - resolved
-        val title = context.resources.getQuantityString(R.plurals.summary_firing, firing, firing)
+        val resolvedText = context.resources.getQuantityString(R.plurals.summary_resolved, resolved, resolved)
+        val title = if (firing > 0) context.resources.getQuantityString(R.plurals.summary_firing, firing, firing) else resolvedText
         val summary = NotificationCompat.Builder(context, CHANNEL_WARNING)
             .setSmallIcon(R.drawable.ic_stat_alert)
             .setColor(ContextCompat.getColor(context, R.color.severity_critical))
             .setContentTitle(title)
-            .setContentText(if (resolved > 0) context.resources.getQuantityString(R.plurals.summary_resolved, resolved, resolved) else null)
+            .setContentText(if (resolved > 0 && firing > 0) resolvedText else null)
             .setStyle(NotificationCompat.InboxStyle().also { style ->
                 active.take(6).forEach { sbn ->
                     style.addLine(sbn.notification.extras.getCharSequence(Notification.EXTRA_TITLE))
@@ -247,7 +270,7 @@ class AlertNotifier(private val context: Context) {
             .setContentIntent(openAlertIntent(null, MainActivity.DESTINATION_CONNECTION))
             .setAutoCancel(true)
             .build()
-        manager.notify(id, notification)
+        postFresh(null, id, notification)
     }
 
     @SuppressLint("MissingPermission")
@@ -261,7 +284,7 @@ class AlertNotifier(private val context: Context) {
             .setAutoCancel(true)
             .setTimeoutAfter(RESOLVED_TIMEOUT_MS)
             .build()
-        manager.notify(id, notification)
+        postFresh(null, id, notification)
     }
 
     fun serviceNotification(title: String, text: String?): Notification =

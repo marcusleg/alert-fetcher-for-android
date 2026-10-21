@@ -68,8 +68,11 @@ class MonitorService : LifecycleService() {
 
         lifecycleScope.launch {
             combine(c.settingsRepository.settingsFlow, c.settingsRepository.monitorStateFlow, c.alertRepository.observeFiringCount()) { s, m, f ->
-                Triple(s, m, f)
-            }.collect { (settings, state, firing) -> updateNotification(settings, state, firing) }
+                notificationContent(s, m, f)
+            }
+                // Settings and state are written often; only re-post when the text changes (Android rate-limits updates).
+                .distinctUntilChanged()
+                .collect { (title, text) -> updateNotification(title, text) }
         }
 
         registerNetworkCallback()
@@ -127,11 +130,10 @@ class MonitorService : LifecycleService() {
         runCatching { connectivity.registerDefaultNetworkCallback(callback) }.onSuccess { networkCallback = callback }
     }
 
-    @SuppressLint("MissingPermission")
-    private fun updateNotification(settings: AppSettings, state: MonitorState, firing: Int) {
+    private fun notificationContent(settings: AppSettings, state: MonitorState, firing: Int): Pair<String, String?> {
         val firingText = resources.getQuantityString(R.plurals.service_firing, firing, firing)
         val host = runCatching { URI(settings.alertmanagerUrl.trim()).host }.getOrNull() ?: settings.alertmanagerUrl
-        val (title, text) = when {
+        return when {
             !settings.isConfigured -> getString(R.string.service_title_not_configured) to null
             state.authProblem -> getString(R.string.service_title_auth) to state.lastError
             state.lastCheckFailed -> getString(R.string.service_title_failing) to state.lastError
@@ -139,6 +141,10 @@ class MonitorService : LifecycleService() {
                 getString(R.string.service_text_ok, firingText, TimeFormat.clock(state.lastSuccessAt))
             else -> getString(R.string.service_title_starting) to null
         }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun updateNotification(title: String, text: String?) {
         val notification = container.notifier.serviceNotification(title, text)
         if (container.notifier.canPost()) NotificationManagerCompat.from(this).notify(AlertNotifier.ID_SERVICE, notification)
     }
