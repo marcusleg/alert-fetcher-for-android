@@ -30,7 +30,7 @@ Your Alertmanager already knows everything that is firing, and it is often alrea
 
 ```
 ┌────────────┐  alerts  ┌──────────────┐        ┌──────────────────────────┐   HTTPS, every 5 min   ┌──────────────────────────┐
-│ Prometheus │ ───────▶ │ Alertmanager │ ◀───── │ Ingress / Gateway        │ ◀───────────────────── │ 📱 Alertmanager Receiver │
+│ Prometheus │ ───────▶ │ Alertmanager │ ◀───── │ Ingress / Gateway        │ ◀───────────────────── │ 📱 Alert Fetcher         │
 └────────────┘          └──────────────┘        │ + OIDC / basic auth proxy│   GET /api/v2/alerts   │  → notifications         │
                                                 └──────────────────────────┘   POST /api/v2/silences│  → alert history         │
                                                                                                     │  → dead man's switch     │
@@ -63,7 +63,7 @@ Because the phone only makes outgoing HTTPS requests:
   - **Heartbeat / dead man's switch**: warns when the always-firing `Watchdog` alert disappears while Alertmanager is reachable, which means Prometheus or its rules are broken.
 - **Alert history**: firing, silenced and resolved alerts with labels, annotations, a timeline, and links to the runbook, dashboard, Prometheus query and Alertmanager.
 - **Silences from your phone**: creates an Alertmanager silence (1 hour up to 1 week) that matches the alert's exact label set, signed with your OIDC username.
-- **Choose what reaches the phone**: by Alertmanager receiver (route alerts to a receiver without integrations), minimum severity, and ignored alert names.
+- **Choose what reaches the phone**: by receiver (route alerts in Alertmanager to a receiver without integrations), minimum severity, and ignored alert names.
 - **Setup help in the app**: connection test (version, cluster state, alert count), a log of recent checks, and copy-paste snippets for the route, `AlertmanagerConfig` and oauth2-proxy.
 - **Private by design**: no analytics and no Google services. Credentials and alerts stay in the app's private storage and are excluded from cloud backups.
 
@@ -95,7 +95,7 @@ Because the phone only makes outgoing HTTPS requests:
 
 1. Register a client for the app at your identity provider:
    - **Client type**: public, with PKCE (S256). A confidential client with a secret works too.
-   - **Redirect URI**: `de.marcusleg.alertmanagerreceiver:/oauth2redirect` (shown in the app with a copy button).
+   - **Redirect URI**: `de.marcusleg.alertfetcher:/oauth2redirect` (shown in the app with a copy button).
    - **Scopes**: `openid profile email offline_access`. `offline_access` gets a refresh token, so you don't have to sign in again when the access token expires.
 2. In the app, choose **OIDC**, enter the issuer URL and client ID, and tap **Sign in**. Your provider's login page opens in a browser tab.
 3. Make the proxy in front of Alertmanager accept the app's tokens as `Authorization: Bearer` tokens. Choose in the app whether the **access token** or the **ID token** is sent: it depends on what your proxy validates (see below).
@@ -106,7 +106,7 @@ oauth2-proxy accepts bearer tokens from additional clients with two flags:
 
 ```sh
 --skip-jwt-bearer-tokens=true
---extra-jwt-issuers=https://sso.example.com/realms/homelab=alertmanager-receiver   # <issuer>=<app's client ID>
+--extra-jwt-issuers=https://sso.example.com/realms/homelab=alert-fetcher   # <issuer>=<app's client ID>
 ```
 
 oauth2-proxy checks that the token's audience is the client ID given here. ID tokens always have that audience; access tokens only with some providers (e.g. Dex, or Keycloak with an audience mapper). If unsure, send the **ID token**.
@@ -116,7 +116,7 @@ With the kube-prometheus-stack and the oauth2-proxy Helm chart, add the flags to
 ```yaml
 extraArgs:
   skip-jwt-bearer-tokens: true
-  extra-jwt-issuers: https://sso.example.com/realms/homelab=alertmanager-receiver
+  extra-jwt-issuers: https://sso.example.com/realms/homelab=alert-fetcher
 ```
 
 This setup is part of the [local test environment](#try-it-locally) and is tested end to end.
@@ -235,7 +235,7 @@ Each channel can be customised in Android's notification settings. Tip: let **Cr
 |---|---|
 | `https://localhost:9443` | Alertmanager behind basic auth (`phone` / `phone`) |
 | `https://localhost:8443` | Alertmanager behind oauth2-proxy, accepting OIDC bearer tokens |
-| `https://localhost:5556/dex` | Dex identity provider (`admin@example.com` / `password`, client ID `alertmanager-receiver`) |
+| `https://localhost:5556/dex` | Dex identity provider (`admin@example.com` / `password`, client ID `alert-fetcher`) |
 
 It creates a throwaway CA in `dev/.state/ca.crt`; install that on the phone or emulator as a CA certificate. With the emulator, forward the ports so `localhost` works on the device:
 
@@ -259,7 +259,7 @@ Requirements: JDK 17 or newer, and the Android SDK (platform 37). Set `sdk.dir` 
 ./gradlew lintDebug
 ```
 
-The debug build has the application ID `de.marcusleg.alertmanagerreceiver.debug`, so its OIDC redirect URI is `de.marcusleg.alertmanagerreceiver.debug:/oauth2redirect`.
+The debug build has the application ID `de.marcusleg.alertfetcher.debug`, so its OIDC redirect URI is `de.marcusleg.alertfetcher.debug:/oauth2redirect`.
 
 Release builds are minified with R8. To sign them, create `keystore.properties` in the project root:
 
@@ -288,7 +288,7 @@ The release fails if the tag doesn't match `appVersion`.
 ### Project layout
 
 ```
-app/src/main/java/de/marcusleg/alertmanagerreceiver/
+app/src/main/java/de/marcusleg/alertfetcher/
 ├── model/          Alertmanager API v2 models (kotlinx.serialization), severity, fingerprints
 ├── alertmanager/   HTTPS API client, request authentication, silences
 ├── auth/           OpenID Connect sign-in and token refresh (AppAuth)

@@ -25,17 +25,17 @@ val appVersionCode = appVersion.split(".").map(String::toInt).let { (major, mino
 }
 
 android {
-    namespace = "de.marcusleg.alertmanagerreceiver"
+    namespace = "de.marcusleg.alertfetcher"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "de.marcusleg.alertmanagerreceiver"
+        applicationId = "de.marcusleg.alertfetcher"
         minSdk = 26
         targetSdk = 37
         versionCode = appVersionCode
         versionName = appVersion
         // OIDC redirect URI scheme (<applicationId>:/oauth2redirect), consumed by AppAuth's redirect activity.
-        manifestPlaceholders["appAuthRedirectScheme"] = "de.marcusleg.alertmanagerreceiver"
+        manifestPlaceholders["appAuthRedirectScheme"] = "de.marcusleg.alertfetcher"
     }
 
     signingConfigs {
@@ -54,7 +54,7 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
-            manifestPlaceholders["appAuthRedirectScheme"] = "de.marcusleg.alertmanagerreceiver.debug"
+            manifestPlaceholders["appAuthRedirectScheme"] = "de.marcusleg.alertfetcher.debug"
         }
         release {
             isMinifyEnabled = true

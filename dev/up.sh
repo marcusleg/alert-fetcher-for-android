@@ -18,7 +18,7 @@ mkdir -p "$STATE"
 
 if [[ ! -f "$STATE/ca.crt" ]]; then
   echo "Creating test CA and certificate for localhost"
-  openssl req -x509 -newkey rsa:2048 -nodes -days 365 -subj "/CN=Alertmanager Receiver test CA" \
+  openssl req -x509 -newkey rsa:2048 -nodes -days 365 -subj "/CN=Alert Fetcher test CA" \
     -addext "basicConstraints=critical,CA:TRUE" -addext "keyUsage=critical,keyCertSign,cRLSign" \
     -keyout "$STATE/ca.key" -out "$STATE/ca.crt" 2>/dev/null
   openssl req -newkey rsa:2048 -nodes -subj "/CN=localhost" -keyout "$STATE/tls.key" -out "$STATE/tls.csr" 2>/dev/null
@@ -33,24 +33,24 @@ DEX_PASSWORD_HASH="$(hash password)"
 BASIC_PASSWORD_HASH="$(hash phone)"
 sed "s|\${DEX_PASSWORD_HASH}|$DEX_PASSWORD_HASH|" dex.yaml > "$STATE/dex.yaml"
 
-"$ENGINE" rm -f amr-alertmanager amr-dex amr-oauth2-proxy amr-caddy >/dev/null 2>&1 || true
+"$ENGINE" rm -f af-alertmanager af-dex af-oauth2-proxy af-caddy >/dev/null 2>&1 || true
 
-"$ENGINE" run -d --name amr-alertmanager --network host \
+"$ENGINE" run -d --name af-alertmanager --network host \
   -v "$PWD/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro,Z" \
   quay.io/prometheus/alertmanager:v0.34.1 \
   --config.file=/etc/alertmanager/alertmanager.yml --web.listen-address=127.0.0.1:9093 \
   --cluster.listen-address= --web.external-url=https://localhost:9443 >/dev/null
 
-"$ENGINE" run -d --name amr-dex --network host -v "$STATE:/state:ro,Z" --tmpfs /var/dex:mode=1777 \
+"$ENGINE" run -d --name af-dex --network host -v "$STATE:/state:ro,Z" --tmpfs /var/dex:mode=1777 \
   ghcr.io/dexidp/dex:v2.45.1 dex serve /state/dex.yaml >/dev/null
 
-"$ENGINE" run -d --name amr-caddy --network host -v "$STATE:/state:ro,Z" -v "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro,Z" \
+"$ENGINE" run -d --name af-caddy --network host -v "$STATE:/state:ro,Z" -v "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro,Z" \
   -e BASIC_PASSWORD_HASH="$BASIC_PASSWORD_HASH" docker.io/library/caddy:2.10 >/dev/null
 
 # Wait for Dex: oauth2-proxy discovers it on startup.
 for _ in $(seq 30); do curl -sf --cacert "$STATE/ca.crt" https://localhost:5556/dex/.well-known/openid-configuration >/dev/null && break; sleep 1; done
 
-"$ENGINE" run -d --name amr-oauth2-proxy --network host -v "$STATE:/state:ro,Z" -e SSL_CERT_FILE=/state/ca.crt \
+"$ENGINE" run -d --name af-oauth2-proxy --network host -v "$STATE:/state:ro,Z" -e SSL_CERT_FILE=/state/ca.crt \
   quay.io/oauth2-proxy/oauth2-proxy:v7.15.5 \
   --provider=oidc --oidc-issuer-url=https://localhost:5556/dex \
   --client-id=oauth2-proxy --client-secret=oauth2-proxy-secret \
@@ -58,6 +58,6 @@ for _ in $(seq 30); do curl -sf --cacert "$STATE/ca.crt" https://localhost:5556/
   --upstream=http://127.0.0.1:9093 --http-address= --https-address=0.0.0.0:8443 \
   --tls-cert-file=/state/tls.crt --tls-key-file=/state/tls.key \
   --redirect-url=https://localhost:8443/oauth2/callback --skip-provider-button \
-  --skip-jwt-bearer-tokens=true --extra-jwt-issuers=https://localhost:5556/dex=alertmanager-receiver >/dev/null
+  --skip-jwt-bearer-tokens=true --extra-jwt-issuers=https://localhost:5556/dex=alert-fetcher >/dev/null
 
 echo "Test environment is up. CA certificate: $STATE/ca.crt"

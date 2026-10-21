@@ -16,12 +16,12 @@ expiry:
   idTokens: 10m
 staticClients:
   # The app: a public client using PKCE, no secret.
-  - id: alertmanager-receiver
-    name: Alertmanager Receiver
+  - id: alert-fetcher
+    name: Alert Fetcher
     public: true
     redirectURIs:
-      - de.marcusleg.alertmanagerreceiver:/oauth2redirect
-      - de.marcusleg.alertmanagerreceiver.debug:/oauth2redirect
+      - de.marcusleg.alertfetcher:/oauth2redirect
+      - de.marcusleg.alertfetcher.debug:/oauth2redirect
   # oauth2-proxy's own client for browser logins.
   - id: oauth2-proxy
     name: oauth2-proxy
