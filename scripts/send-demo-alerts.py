@@ -1,22 +1,28 @@
 #!/usr/bin/env python3
-"""Send realistic Alertmanager webhook notifications to the Android receiver.
+"""Inject realistic homelab alerts into an Alertmanager through its API.
 
 Useful to try the app without a Prometheus stack, and to produce the README screenshots.
+Works with the local test environment from dev/up.sh out of the box:
 
-    ./scripts/send-demo-alerts.py http://192.168.1.50:9095/webhook --token <bearer token>
-    ./scripts/send-demo-alerts.py http://192.168.1.50:9095/webhook --token <t> --resolve-all
+    ./scripts/send-demo-alerts.py                          # fire all demo alerts (and the Watchdog)
+    ./scripts/send-demo-alerts.py --resolve KubeJobFailed  # resolve some of them
+    ./scripts/send-demo-alerts.py --resolve-all
+    ./scripts/send-demo-alerts.py --no-watchdog            # let the Watchdog heartbeat expire
+
+Against another Alertmanager:
+
+    ./scripts/send-demo-alerts.py --url https://alertmanager.example.com --user admin --password ... --cacert ca.crt
 """
 import argparse
 import base64
 import datetime as dt
-import hashlib
 import json
+import ssl
 import sys
 import urllib.error
 import urllib.request
 
-EXTERNAL_URL = "http://alertmanager.home.arpa:9093"
-PROMETHEUS_URL = "http://prometheus.home.arpa:9090"
+PROMETHEUS_URL = "https://prometheus.home.arpa"
 
 
 def ago(minutes: float) -> str:
@@ -24,18 +30,20 @@ def ago(minutes: float) -> str:
     return t.isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
-def alert(labels, annotations, started_min_ago, status="firing", ended_min_ago=None):
-    fp = hashlib.sha256(json.dumps(labels, sort_keys=True).encode()).hexdigest()[:16]
+def alert(labels, annotations, started_min_ago):
     return {
-        "status": status,
         "labels": labels,
         "annotations": annotations,
         "startsAt": ago(started_min_ago),
-        "endsAt": ago(ended_min_ago) if ended_min_ago is not None else "0001-01-01T00:00:00Z",
         "generatorURL": f"{PROMETHEUS_URL}/graph?g0.expr=up&g0.tab=1",
-        "fingerprint": fp,
     }
 
+
+WATCHDOG = alert(
+    {"alertname": "Watchdog", "severity": "none"},
+    {"summary": "An alert that should always be firing to certify that Alertmanager is working properly."},
+    started_min_ago=60 * 24 * 3,
+)
 
 DEMO = [
     alert(
@@ -89,41 +97,30 @@ DEMO = [
          "job": "kube-state-metrics"},
         {"summary": "Job failed to complete.",
          "description": "Job backup/restic-nightly-29348760 failed to complete. Removing failed job after investigation should clear this alert."},
-        started_min_ago=300, status="resolved", ended_min_ago=40,
+        started_min_ago=300,
     ),
     alert(
         {"alertname": "HostHighCpuLoad", "severity": "warning", "instance": "proxmox-1.home.arpa:9100", "job": "node-exporter"},
         {"summary": "Host high CPU load (instance proxmox-1.home.arpa:9100)",
          "description": "CPU load is > 80% for 10 minutes."},
-        started_min_ago=200, status="resolved", ended_min_ago=150,
+        started_min_ago=200,
     ),
 ]
 
 
-def payload(alerts):
-    return {
-        "version": "4",
-        "groupKey": "{}:{}",
-        "truncatedAlerts": 0,
-        "status": "firing" if any(a["status"] == "firing" for a in alerts) else "resolved",
-        "receiver": "android",
-        "groupLabels": {},
-        "commonLabels": {},
-        "commonAnnotations": {},
-        "externalURL": EXTERNAL_URL,
-        "alerts": alerts,
-    }
 
-
-def post(url, body, args):
-    req = urllib.request.Request(url, data=json.dumps(body).encode(), method="POST",
+def post(args, alerts):
+    body = json.dumps(alerts).encode()
+    req = urllib.request.Request(args.url.rstrip("/") + "/api/v2/alerts", data=body, method="POST",
                                  headers={"Content-Type": "application/json"})
     if args.token:
         req.add_header("Authorization", f"Bearer {args.token}")
-    elif args.basic:
-        req.add_header("Authorization", "Basic " + base64.b64encode(args.basic.encode()).decode())
+    elif args.user:
+        credentials = f"{args.user}:{args.password or ''}".encode()
+        req.add_header("Authorization", "Basic " + base64.b64encode(credentials).decode())
+    context = ssl.create_default_context(cafile=args.cacert) if args.cacert else None
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.urlopen(req, timeout=10, context=context) as resp:
             return resp.status
     except urllib.error.HTTPError as e:
         return e.code
@@ -131,22 +128,32 @@ def post(url, body, args):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("url", help="webhook URL, e.g. http://192.168.1.50:9095/webhook")
+    p.add_argument("--url", default="http://127.0.0.1:9093", help="Alertmanager base URL (default: the dev/up.sh instance)")
+    p.add_argument("--user", help="basic auth user")
+    p.add_argument("--password", help="basic auth password")
     p.add_argument("--token", help="bearer token")
-    p.add_argument("--basic", metavar="USER:PASS", help="basic auth credentials")
-    p.add_argument("--resolve-all", action="store_true", help="send every demo alert as resolved")
+    p.add_argument("--cacert", help="CA certificate to trust for https URLs")
+    p.add_argument("--resolve", nargs="+", metavar="ALERTNAME", help="resolve these demo alerts instead of firing")
+    p.add_argument("--resolve-all", action="store_true", help="resolve every demo alert")
+    p.add_argument("--no-watchdog", action="store_true", help="don't (re)fire the Watchdog heartbeat")
+    p.add_argument("--hours", type=float, default=1, help="how long fired alerts stay active (default 1)")
     args = p.parse_args()
 
-    alerts = DEMO
-    if args.resolve_all:
-        alerts = [dict(a, status="resolved", endsAt=ago(0)) for a in DEMO]
-    # One notification per alert, like Alertmanager with group_by: [alertname].
-    failed = 0
+    if args.resolve or args.resolve_all:
+        names = {a["labels"]["alertname"] for a in DEMO} if args.resolve_all else set(args.resolve)
+        alerts = [dict(a, endsAt=ago(0)) for a in DEMO if a["labels"]["alertname"] in names]
+        action = "resolved"
+    else:
+        alerts = [dict(a, endsAt=ago(-60 * args.hours)) for a in DEMO]
+        if not args.no_watchdog:
+            alerts.append(dict(WATCHDOG, endsAt=ago(-60 * args.hours)))
+        action = "firing"
+
+    status = post(args, alerts)
     for a in alerts:
-        status = post(args.url, payload([a]), args)
-        print(f"{status}  {a['status']:8}  {a['labels']['alertname']}")
-        failed += status >= 300
-    sys.exit(1 if failed else 0)
+        print(f"{action:8}  {a['labels']['alertname']}")
+    print(f"HTTP {status}")
+    sys.exit(0 if status < 300 else 1)
 
 
 if __name__ == "__main__":

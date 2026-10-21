@@ -1,0 +1,33 @@
+# Dex as a stand-in for Keycloak / Authentik / Authelia / Zitadel.
+issuer: https://localhost:5556/dex
+storage:
+  type: memory
+web:
+  https: 0.0.0.0:5556
+  tlsCert: /state/tls.crt
+  tlsKey: /state/tls.key
+oauth2:
+  skipApprovalScreen: true
+expiry:
+  # Short-lived tokens exercise the refresh path quickly.
+  idTokens: 10m
+staticClients:
+  # The app: a public client using PKCE, no secret.
+  - id: alertmanager-receiver
+    name: Alertmanager Receiver
+    public: true
+    redirectURIs:
+      - de.marcusleg.alertmanagerreceiver:/oauth2redirect
+      - de.marcusleg.alertmanagerreceiver.debug:/oauth2redirect
+  # oauth2-proxy's own client for browser logins.
+  - id: oauth2-proxy
+    name: oauth2-proxy
+    secret: oauth2-proxy-secret
+    redirectURIs:
+      - https://localhost:8443/oauth2/callback
+enablePasswordDB: true
+staticPasswords:
+  - email: admin@example.com
+    username: admin
+    userID: 08a8684b-db88-4b73-90a9-3cd1661f5466
+    hash: "${DEX_PASSWORD_HASH}"

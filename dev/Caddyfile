@@ -1,0 +1,13 @@
+# Stand-in for an Ingress with basic auth in front of Alertmanager.
+{
+	auto_https off
+	admin off
+}
+
+https://localhost:9443 {
+	tls /state/tls.crt /state/tls.key
+	basic_auth {
+		phone {$BASIC_PASSWORD_HASH}
+	}
+	reverse_proxy 127.0.0.1:9093
+}

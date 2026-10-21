@@ -12,3 +12,4 @@
 *.keystore
 *.jks
 keystore.properties
+/dev/.state/
