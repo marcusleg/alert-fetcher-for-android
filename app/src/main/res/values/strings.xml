@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Alertmanager Receiver</string>
+
+    <string name="channel_group_alerts">Alerts</string>
+    <string name="channel_group_system">Receiver</string>
+    <string name="channel_critical">Critical alerts</string>
+    <string name="channel_critical_desc">Firing alerts with severity critical. Consider letting these override Do Not Disturb.</string>
+    <string name="channel_warning">Warning alerts</string>
+    <string name="channel_warning_desc">Firing alerts with severity warning or an unknown severity.</string>
+    <string name="channel_info">Info alerts</string>
+    <string name="channel_info_desc">Firing alerts with severity info.</string>
+    <string name="channel_resolved">Resolved alerts</string>
+    <string name="channel_resolved_desc">Alerts that stopped firing.</string>
+    <string name="channel_heartbeat">Heartbeat</string>
+    <string name="channel_heartbeat_desc">Warns when the Alertmanager heartbeat (dead man\'s switch) stops arriving.</string>
+    <string name="channel_service">Receiver status</string>
+    <string name="channel_service_desc">Persistent notification shown while the webhook receiver is running.</string>
+
+    <string name="action_acknowledge">Acknowledge</string>
+    <string name="action_silence_1h">Silence 1h</string>
+    <string name="action_stop">Stop receiver</string>
+
+    <string name="notification_resolved_title">Resolved: %1$s</string>
+    <plurals name="summary_firing">
+        <item quantity="one">%1$d alert</item>
+        <item quantity="other">%1$d alerts</item>
+    </plurals>
+    <plurals name="summary_resolved">
+        <item quantity="one">%1$d resolved</item>
+        <item quantity="other">%1$d resolved</item>
+    </plurals>
+
+    <string name="heartbeat_last_seen">Last heartbeat %1$s</string>
+    <string name="heartbeat_never_seen">No heartbeat received yet</string>
+    <string name="heartbeat_missing_title">%1$s heartbeat missing</string>
+    <plurals name="heartbeat_missing_text">
+        <item quantity="one">No %2$s alert arrived for %1$d minute. Prometheus, Alertmanager or the network path to this phone may be down.</item>
+        <item quantity="other">No %2$s alert arrived for %1$d minutes. Prometheus, Alertmanager or the network path to this phone may be down.</item>
+    </plurals>
+    <string name="heartbeat_restored_title">%1$s heartbeat restored</string>
+    <string name="heartbeat_restored_text">Alertmanager is reaching this phone again.</string>
+
+    <string name="service_title_starting">Starting receiver…</string>
+    <string name="service_text_starting">Opening the HTTP server</string>
+    <string name="service_title_running">Listening on %1$s</string>
+    <string name="service_title_failed">Receiver failed to start</string>
+    <string name="service_title_stopped">Receiver stopped</string>
+    <string name="service_port">port %1$d</string>
+    <plurals name="service_firing">
+        <item quantity="zero">No firing alerts</item>
+        <item quantity="one">%1$d firing alert</item>
+        <item quantity="other">%1$d firing alerts</item>
+    </plurals>
+
+    <string name="silence_created">Silence created in Alertmanager</string>
+    <string name="silence_failed">Silence failed: %1$s</string>
+</resources>

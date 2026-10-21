@@ -1,0 +1,49 @@
+{
+  "receiver": "android",
+  "status": "firing",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "KubePodCrashLooping",
+        "container": "app",
+        "namespace": "media",
+        "pod": "jellyfin-7d9c8b6f4-x2x9k",
+        "severity": "warning"
+      },
+      "annotations": {
+        "description": "Pod media/jellyfin-7d9c8b6f4-x2x9k (app) is in waiting state (reason: \"CrashLoopBackOff\").",
+        "runbook_url": "https://runbooks.prometheus-operator.dev/runbooks/kubernetes/kubepodcrashlooping",
+        "summary": "Pod is crash looping."
+      },
+      "startsAt": "2026-10-20T21:14:03.123456789Z",
+      "endsAt": "0001-01-01T00:00:00Z",
+      "generatorURL": "http://prometheus.lan/graph?g0.expr=max_over_time%28...%29",
+      "fingerprint": "4b0d2a5e7c9f1d3a"
+    },
+    {
+      "status": "resolved",
+      "labels": {
+        "alertname": "NodeFilesystemSpaceFillingUp",
+        "device": "/dev/sda1",
+        "instance": "10.0.0.11:9100",
+        "severity": "critical"
+      },
+      "annotations": {
+        "summary": "Filesystem is predicted to run out of space within the next 4 hours."
+      },
+      "startsAt": "2026-10-20T19:00:00Z",
+      "endsAt": "2026-10-20T21:00:00+02:00",
+      "generatorURL": "",
+      "fingerprint": ""
+    }
+  ],
+  "groupLabels": { "alertname": "KubePodCrashLooping" },
+  "commonLabels": { "alertname": "KubePodCrashLooping" },
+  "commonAnnotations": {},
+  "externalURL": "http://alertmanager.lan:9093",
+  "version": "4",
+  "groupKey": "{}:{alertname=\"KubePodCrashLooping\"}",
+  "truncatedAlerts": 0,
+  "someFutureField": { "nested": true }
+}

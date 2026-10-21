@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="brand">#3F51B5</color>
+    <color name="severity_critical">#D32F2F</color>
+    <color name="severity_warning">#E65100</color>
+    <color name="severity_info">#1E88E5</color>
+    <color name="resolved">#2E7D32</color>
+    <color name="window_background">#FBF8FF</color>
+</resources>
