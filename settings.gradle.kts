@@ -20,5 +20,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "alertmanager-receiver-for-android"
+rootProject.name = "alert-fetcher-for-android"
 include(":app")

@@ -61,9 +61,9 @@ jobs:
           echo "$SIGNING_KEYSTORE_BASE64" | base64 --decode > release.jks
           export SIGNING_STORE_FILE=release.jks
           ./gradlew assembleRelease
-          cp app/build/outputs/apk/release/app-release.apk "alertmanager-receiver-${GITHUB_REF_NAME}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "alert-fetcher-${GITHUB_REF_NAME}.apk"
 
       - uses: softprops/action-gh-release@v2
         with:
-          files: alertmanager-receiver-*.apk
+          files: alert-fetcher-*.apk
           generate_release_notes: true

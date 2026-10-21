@@ -2,14 +2,14 @@
 
 <img src="docs/icon.png" width="96" alt="App icon" />
 
-# Alertmanager Receiver for Android
+# Alert Fetcher for Android
 
 **Get Prometheus Alertmanager alerts on your phone, straight from your own Alertmanager.**
 
 The app checks your Alertmanager's API over HTTPS and turns new alerts into Android notifications.
 No Pushover, Telegram, ntfy, Firebase or any other third-party relay is involved, and nothing on the phone listens for incoming connections.
 
-[![Build](https://github.com/marcusleg/alertmanager-receiver-for-android/actions/workflows/build.yml/badge.svg)](https://github.com/marcusleg/alertmanager-receiver-for-android/actions/workflows/build.yml)
+[![Build](https://github.com/marcusleg/alert-fetcher-for-android/actions/workflows/build.yml/badge.svg)](https://github.com/marcusleg/alert-fetcher-for-android/actions/workflows/build.yml)
 ![Android 8.0+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-Jetpack%20Compose-7F52FF?logo=kotlin&logoColor=white)
 
@@ -82,7 +82,7 @@ Because the phone only makes outgoing HTTPS requests:
 
 ## Getting started
 
-1. **Install** the APK from the [releases page](https://github.com/marcusleg/alertmanager-receiver-for-android/releases), or [build it yourself](#building).
+1. **Install** the APK from the [releases page](https://github.com/marcusleg/alert-fetcher-for-android/releases), or [build it yourself](#building).
 2. **Open the app** and allow notifications.
 3. On the **Connection** tab, enter the URL of Alertmanager, the same address you open its web UI with, e.g. `https://alertmanager.example.com`.
 4. Choose how to **authenticate** (see below) and tap **Test connection**.
