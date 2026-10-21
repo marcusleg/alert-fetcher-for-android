@@ -3,6 +3,7 @@ package de.marcusleg.alertmanagerreceiver.auth
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.util.Log
 import androidx.core.net.toUri
 import de.marcusleg.alertmanagerreceiver.alertmanager.AuthenticationException
 import de.marcusleg.alertmanagerreceiver.data.AppSettings
@@ -120,7 +121,12 @@ class OidcManager(private val context: Context, private val settingsRepository: 
         try {
             val (accessToken, idToken) = suspendCancellableCoroutine { continuation ->
                 state.performActionWithFreshTokens(service, clientAuthentication(settings)) { access, id, ex ->
-                    if (ex == null) continuation.resume(access to id) else continuation.resumeWithException(ex.toIoException())
+                    if (ex == null) {
+                        continuation.resume(access to id)
+                    } else {
+                        Log.w(TAG, "Token refresh failed", ex)
+                        continuation.resumeWithException(ex.toIoException())
+                    }
                 }
             }
             when (settings.oidcTokenType) {
@@ -173,6 +179,7 @@ class OidcManager(private val context: Context, private val settingsRepository: 
     }
 
     companion object {
+        private const val TAG = "OidcManager"
         private const val EXPIRY_MARGIN_MS = 60_000L
 
         fun validateIssuer(issuer: String): String {
@@ -182,10 +189,12 @@ class OidcManager(private val context: Context, private val settingsRepository: 
             return value
         }
 
-        private fun AuthorizationException?.describe(): String = when {
-            this == null -> "unknown error"
-            errorDescription != null -> "$error: $errorDescription"
-            else -> error ?: message ?: "error $code"
+        private fun AuthorizationException?.describe(): String {
+            if (this == null) return "unknown error"
+            val summary = listOfNotNull(error, errorDescription).joinToString(": ").ifEmpty { message ?: "error $code" }
+            // General errors (network, TLS, JSON) wrap the exception that explains them.
+            val reason = cause?.let { "${it.javaClass.simpleName}: ${it.message}" }
+            return if (reason != null && type == AuthorizationException.TYPE_GENERAL_ERROR) "$summary ($reason)" else summary
         }
 
         /** Rejected refresh tokens need a new sign-in; network trouble is transient. */
