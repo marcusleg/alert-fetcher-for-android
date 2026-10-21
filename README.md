@@ -7,7 +7,7 @@
 **Get Prometheus Alertmanager alerts on your phone, straight from your own Alertmanager.**
 
 The app checks your Alertmanager's API over HTTPS and turns new alerts into Android notifications.
-No Pushover, Telegram, ntfy, Firebase or any other third-party relay is involved, and nothing on the phone listens for incoming connections.
+No Pushover, Telegram, ntfy, Firebase or any other third-party relay is involved.
 
 [![Build](https://github.com/marcusleg/alert-fetcher-for-android/actions/workflows/build.yml/badge.svg)](https://github.com/marcusleg/alert-fetcher-for-android/actions/workflows/build.yml)
 ![Android 8.0+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)
@@ -271,7 +271,19 @@ keyPassword=…
 ```
 
 …or set `SIGNING_STORE_FILE`, `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS` and `SIGNING_KEY_PASSWORD`, then run `./gradlew assembleRelease`.
-The GitHub Actions workflow builds and tests every push. On `v*` tags it publishes a signed APK to GitHub Releases; this requires the signing secrets to be set in the repository.
+
+### Releases
+
+The [GitHub Actions workflow](.github/workflows/build.yml) runs the unit tests and lint and builds the debug and release APKs on every push and pull request. Pushing a `v*` tag also publishes a signed APK and its SHA-256 checksum to GitHub Releases. The signing key comes from the repository secrets `SIGNING_KEYSTORE_BASE64`, `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS` and `SIGNING_KEY_PASSWORD`.
+
+To release, set `appVersion` in [`gradle.properties`](gradle.properties) (the version code is derived from it), commit, and push an annotated tag whose message becomes the release notes:
+
+```sh
+git tag -a v0.2.0 -m "Alert Fetcher 0.2.0" -m "- What changed"
+git push origin v0.2.0
+```
+
+The release fails if the tag doesn't match `appVersion`.
 
 ### Project layout
 
@@ -291,3 +303,7 @@ scripts/            Demo alert injector
 ```
 
 Tech: Kotlin · Jetpack Compose · Material 3 · AppAuth · Room · DataStore · kotlinx.serialization · coroutines/Flow.
+
+## License
+
+[MIT](LICENSE)
