@@ -18,6 +18,12 @@ val keystoreProperties = Properties().apply {
 fun signingValue(key: String, env: String): String? =
     keystoreProperties.getProperty(key) ?: System.getenv(env)
 
+// The version lives in gradle.properties; release tags must be v<appVersion>.
+val appVersion = providers.gradleProperty("appVersion").get()
+val appVersionCode = appVersion.split(".").map(String::toInt).let { (major, minor, patch) ->
+    major * 10_000 + minor * 100 + patch
+}
+
 android {
     namespace = "de.marcusleg.alertmanagerreceiver"
     compileSdk = 37
@@ -26,8 +32,8 @@ android {
         applicationId = "de.marcusleg.alertmanagerreceiver"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = appVersionCode
+        versionName = appVersion
         // OIDC redirect URI scheme (<applicationId>:/oauth2redirect), consumed by AppAuth's redirect activity.
         manifestPlaceholders["appAuthRedirectScheme"] = "de.marcusleg.alertmanagerreceiver"
     }
