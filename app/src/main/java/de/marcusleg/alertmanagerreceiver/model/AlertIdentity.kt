@@ -7,10 +7,10 @@ import java.time.format.DateTimeParseException
 
 object AlertIdentity {
     /**
-     * Alertmanager includes a fingerprint for every alert; older or third-party senders may not,
-     * so fall back to a stable hash over the sorted label set (which is what Alertmanager does too).
+     * Alertmanager includes a fingerprint for every alert; in case a proxy or an old version drops it,
+     * fall back to a stable hash over the sorted label set (which is what Alertmanager does too).
      */
-    fun fingerprint(alert: WebhookAlert): String =
+    fun fingerprint(alert: ApiAlert): String =
         alert.fingerprint.ifBlank { fingerprintOf(alert.labels) }
 
     fun fingerprintOf(labels: Map<String, String>): String {

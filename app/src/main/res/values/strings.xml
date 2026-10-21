@@ -3,7 +3,7 @@
     <string name="app_name">Alertmanager Receiver</string>
 
     <string name="channel_group_alerts">Alerts</string>
-    <string name="channel_group_system">Receiver</string>
+    <string name="channel_group_system">Monitoring</string>
     <string name="channel_critical">Critical alerts</string>
     <string name="channel_critical_desc">Firing alerts with severity critical. Consider letting these override Do Not Disturb.</string>
     <string name="channel_warning">Warning alerts</string>
@@ -12,14 +12,14 @@
     <string name="channel_info_desc">Firing alerts with severity info.</string>
     <string name="channel_resolved">Resolved alerts</string>
     <string name="channel_resolved_desc">Alerts that stopped firing.</string>
-    <string name="channel_heartbeat">Heartbeat</string>
-    <string name="channel_heartbeat_desc">Warns when the Alertmanager heartbeat (dead man\'s switch) stops arriving.</string>
-    <string name="channel_service">Receiver status</string>
-    <string name="channel_service_desc">Persistent notification shown while the webhook receiver is running.</string>
+    <string name="channel_health">Monitoring problems</string>
+    <string name="channel_health_desc">Warns when Alertmanager can\'t be reached, sign-in is required, or the heartbeat alert is missing.</string>
+    <string name="channel_service">Monitoring status</string>
+    <string name="channel_service_desc">Persistent notification shown while Alertmanager is being monitored.</string>
 
     <string name="action_acknowledge">Acknowledge</string>
     <string name="action_silence_1h">Silence 1h</string>
-    <string name="action_stop">Stop receiver</string>
+    <string name="action_stop">Stop monitoring</string>
 
     <string name="notification_resolved_title">Resolved: %1$s</string>
     <plurals name="summary_firing">
@@ -31,24 +31,28 @@
         <item quantity="other">%1$d resolved</item>
     </plurals>
 
-    <string name="heartbeat_last_seen">Last heartbeat %1$s</string>
-    <string name="heartbeat_never_seen">No heartbeat received yet</string>
     <string name="heartbeat_missing_title">%1$s heartbeat missing</string>
     <plurals name="heartbeat_missing_text">
-        <item quantity="one">No %2$s alert arrived for %1$d minute. Prometheus, Alertmanager or the network path to this phone may be down.</item>
-        <item quantity="other">No %2$s alert arrived for %1$d minutes. Prometheus, Alertmanager or the network path to this phone may be down.</item>
+        <item quantity="one">Alertmanager is reachable, but %2$s hasn\'t been firing for %1$d minute. Prometheus or its alerting rules may be broken.</item>
+        <item quantity="other">Alertmanager is reachable, but %2$s hasn\'t been firing for %1$d minutes. Prometheus or its alerting rules may be broken.</item>
     </plurals>
     <string name="heartbeat_restored_title">%1$s heartbeat restored</string>
-    <string name="heartbeat_restored_text">Alertmanager is reaching this phone again.</string>
 
-    <string name="service_title_starting">Starting receiver…</string>
-    <string name="service_text_starting">Opening the HTTP server</string>
-    <string name="service_title_running">Listening on %1$s</string>
-    <string name="service_title_failed">Receiver failed to start</string>
-    <string name="service_title_stopped">Receiver stopped</string>
-    <string name="service_port">port %1$d</string>
+    <string name="health_contact_lost_title">Can\'t reach Alertmanager</string>
+    <string name="health_last_success">Last successful check at %1$s.</string>
+    <string name="health_never_succeeded">No check has succeeded yet.</string>
+    <string name="health_auth_title">Alertmanager sign-in required</string>
+    <string name="health_auth_text">The credentials were rejected. Open the app to fix the connection.</string>
+    <string name="health_restored_title">Alertmanager reachable again</string>
+
+    <string name="service_title_starting">Connecting to Alertmanager…</string>
+    <string name="service_title_not_configured">Set up the Alertmanager connection</string>
+    <string name="service_title_auth">Sign-in required</string>
+    <string name="service_title_failing">Can\'t reach Alertmanager</string>
+    <string name="service_title_ok">Monitoring %1$s</string>
+    <string name="service_text_ok">%1$s · checked at %2$s</string>
     <plurals name="service_firing">
-        <item quantity="zero">No firing alerts</item>
+        <item quantity="zero">Nothing firing</item>
         <item quantity="one">%1$d firing alert</item>
         <item quantity="other">%1$d firing alerts</item>
     </plurals>

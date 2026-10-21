@@ -16,7 +16,7 @@ import kotlinx.coroutines.launch
 data class AlertDetailUiState(
     val loading: Boolean = true,
     val alert: AlertEntity? = null,
-    val alertmanagerUrl: String? = null,
+    val canSilence: Boolean = false,
     val silencing: Boolean = false,
 )
 
@@ -33,7 +33,7 @@ class AlertDetailViewModel(private val container: AppContainer, private val fing
         AlertDetailUiState(
             loading = false,
             alert = alert,
-            alertmanagerUrl = settings.alertmanagerUrl.ifBlank { alert?.externalUrl.orEmpty() }.ifBlank { null },
+            canSilence = settings.isConfigured,
             silencing = silencing,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AlertDetailUiState())

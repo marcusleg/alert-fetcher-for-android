@@ -1,0 +1,58 @@
+[
+  {
+    "annotations": {
+      "description": "Pod media/jellyfin-0 (jellyfin) is in waiting state (reason: \"CrashLoopBackOff\").",
+      "runbook_url": "https://runbooks.prometheus-operator.dev/runbooks/kubernetes/kubepodcrashlooping",
+      "summary": "Pod is crash looping."
+    },
+    "endsAt": "2026-10-21T10:24:30.000Z",
+    "fingerprint": "5a0b1c2d3e4f5061",
+    "receivers": [{"name": "phone"}, {"name": "default"}],
+    "startsAt": "2026-10-21T09:58:30.000Z",
+    "status": {"inhibitedBy": [], "mutedBy": [], "silencedBy": [], "state": "active"},
+    "updatedAt": "2026-10-21T10:20:30.123Z",
+    "generatorURL": "https://prometheus.example.com/graph?g0.expr=max_over_time%28kube_pod_container_status_waiting_reason%5B5m%5D%29&g0.tab=1",
+    "labels": {
+      "alertname": "KubePodCrashLooping",
+      "container": "jellyfin",
+      "namespace": "media",
+      "pod": "jellyfin-0",
+      "prometheus": "monitoring/kube-prometheus-stack-prometheus",
+      "severity": "warning"
+    }
+  },
+  {
+    "annotations": {"summary": "Node exporter is down."},
+    "endsAt": "2026-10-21T10:24:30.000Z",
+    "fingerprint": "7f00000000000001",
+    "receivers": [{"name": "default"}],
+    "startsAt": "2026-10-21T10:10:00.000Z",
+    "status": {"inhibitedBy": [], "mutedBy": ["2a8f2f3e-6f6b-4b4e-9f3c-1d2e3f4a5b6c"], "silencedBy": ["2a8f2f3e-6f6b-4b4e-9f3c-1d2e3f4a5b6c"], "state": "suppressed"},
+    "updatedAt": "2026-10-21T10:20:30.123Z",
+    "generatorURL": "",
+    "labels": {"alertname": "TargetDown", "job": "node-exporter", "severity": "critical"}
+  },
+  {
+    "annotations": {"summary": "An alert that should always be firing to certify that Alertmanager is working properly."},
+    "endsAt": "2026-10-21T10:24:30.000Z",
+    "fingerprint": "0e0e0e0e0e0e0e0e",
+    "receivers": [{"name": "null"}],
+    "startsAt": "2026-10-20T08:00:00.000Z",
+    "status": {"inhibitedBy": [], "mutedBy": [], "silencedBy": [], "state": "active"},
+    "updatedAt": "2026-10-21T10:20:30.123Z",
+    "generatorURL": "",
+    "labels": {"alertname": "Watchdog", "severity": "none"}
+  },
+  {
+    "annotations": {"summary": "Info-level alert inhibition."},
+    "endsAt": "2026-10-21T10:24:30.000Z",
+    "fingerprint": "1111111111111111",
+    "receivers": [{"name": "null"}],
+    "startsAt": "2026-10-20T08:00:00.000Z",
+    "status": {"inhibitedBy": [], "mutedBy": [], "silencedBy": [], "state": "active"},
+    "updatedAt": "2026-10-21T10:20:30.123Z",
+    "generatorURL": "",
+    "labels": {"alertname": "InfoInhibitor", "severity": "none"},
+    "someFutureField": {"nested": true}
+  }
+]

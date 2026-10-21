@@ -29,11 +29,4 @@ class SeverityTest {
         assertTrue(Severity.WARNING.isAtLeast(Severity.WARNING))
         assertFalse(Severity.INFO.isAtLeast(Severity.WARNING))
     }
-
-    @Test
-    fun `parses status`() {
-        assertEquals(AlertStatus.RESOLVED, AlertStatus.fromString("resolved"))
-        assertEquals(AlertStatus.FIRING, AlertStatus.fromString("firing"))
-        assertEquals(AlertStatus.FIRING, AlertStatus.fromString(null))
-    }
 }

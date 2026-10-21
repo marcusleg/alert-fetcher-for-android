@@ -121,7 +121,7 @@ fun AlertDetailScreen(viewModel: AlertDetailViewModel, onBack: () -> Unit) {
         AlertDetailContent(
             alert = alert,
             silencing = state.silencing,
-            canSilence = state.alertmanagerUrl != null,
+            canSilence = state.canSilence,
             onAcknowledge = viewModel::setAcknowledged,
             onSilence = { silenceDialog = true },
             modifier = Modifier.padding(padding),
@@ -141,7 +141,7 @@ fun AlertDetailScreen(viewModel: AlertDetailViewModel, onBack: () -> Unit) {
         AlertDialog(
             onDismissRequest = { deleteDialog = false },
             title = { Text("Delete alert?") },
-            text = { Text("It is removed from this device only. If it is still firing, Alertmanager will send it again.") },
+            text = { Text("It is removed from this device only. If it is still firing, it comes back with the next check.") },
             confirmButton = { TextButton(onClick = { deleteDialog = false; viewModel.delete(onBack) }) { Text("Delete") } },
             dismissButton = { TextButton(onClick = { deleteDialog = false }) { Text("Cancel") } },
         )
@@ -163,7 +163,8 @@ private fun AlertDetailContent(
     val color = alertColor(alert)
     val statusColors = LocalStatusColors.current
     val firing = alert.status == AlertStatus.FIRING
-    val silenced = alert.silencedUntil != null && alert.silencedUntil > now
+    val suppressed = alert.status == AlertStatus.SUPPRESSED
+    val silencedUntil = alert.silencedUntil?.takeIf { it > now && alert.status != AlertStatus.RESOLVED }
 
     Column(
         modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp),
@@ -172,14 +173,19 @@ private fun AlertDetailContent(
         // Header
         SectionCard(title = null) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                if (firing) {
-                    Pill("FIRING", color, filled = true)
-                } else {
-                    Pill("RESOLVED", statusColors.resolved, filled = true, icon = Icons.Outlined.CheckCircle)
+                when (alert.status) {
+                    AlertStatus.FIRING -> Pill("FIRING", color, filled = true)
+                    AlertStatus.SUPPRESSED -> Pill(
+                        if (alert.silencedBy.isEmpty() && alert.inhibitedBy.isNotEmpty()) "INHIBITED" else "SILENCED",
+                        MaterialTheme.colorScheme.secondary,
+                        filled = true,
+                        icon = Icons.Outlined.NotificationsOff,
+                    )
+                    AlertStatus.RESOLVED -> Pill("RESOLVED", statusColors.resolved, filled = true, icon = Icons.Outlined.CheckCircle)
                 }
                 Pill(alert.severity.label, statusColors.forSeverity(alert.severity))
-                if (silenced) {
-                    Pill("Silenced until ${TimeFormat.absolute(alert.silencedUntil)}", MaterialTheme.colorScheme.secondary, icon = Icons.Outlined.NotificationsOff)
+                if (silencedUntil != null) {
+                    Pill("Silenced until ${TimeFormat.absolute(silencedUntil)}", MaterialTheme.colorScheme.secondary, icon = Icons.Outlined.NotificationsOff)
                 } else if (alert.acknowledged && firing) {
                     Pill("Acknowledged", MaterialTheme.colorScheme.secondary, icon = Icons.Outlined.TaskAlt)
                 }
@@ -189,7 +195,7 @@ private fun AlertDetailContent(
             alert.description?.takeIf { it != alert.summary }?.let {
                 Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            if (firing) {
+            if (firing || suppressed) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
                     if (alert.acknowledged) {
                         FilledTonalButton(onClick = { onAcknowledge(false) }) { Text("Unacknowledge") }
@@ -198,7 +204,7 @@ private fun AlertDetailContent(
                             Icon(Icons.Outlined.TaskAlt, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Acknowledge")
                         }
                     }
-                    Button(onClick = onSilence, enabled = canSilence && !silencing) {
+                    Button(onClick = onSilence, enabled = canSilence && !silencing && !suppressed) {
                         if (silencing) {
                             CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
                         } else {
@@ -229,12 +235,14 @@ private fun AlertDetailContent(
 
         // Timing
         SectionCard("Timeline", icon = Icons.Outlined.Schedule) {
-            val started = alert.startsAt ?: alert.firstReceivedAt
+            val started = alert.startsAt ?: alert.firstSeenAt
             TimeRow("Started", started, now)
             alert.endsAt?.let { TimeRow("Resolved", it, now) }
             KeyValueRow("Duration", TimeFormat.duration((alert.endsAt ?: now) - started))
-            TimeRow("Last notification", alert.lastReceivedAt, now)
-            alert.receiver?.let { KeyValueRow("Receiver", it) }
+            TimeRow(if (alert.status == AlertStatus.RESOLVED) "Last seen" else "Last checked", alert.lastSeenAt, now)
+            if (alert.receivers.isNotEmpty()) KeyValueRow(if (alert.receivers.size == 1) "Receiver" else "Receivers", alert.receivers.joinToString(", "))
+            if (alert.silencedBy.isNotEmpty()) KeyValueRow("Silenced by", alert.silencedBy.joinToString(", "))
+            if (alert.inhibitedBy.isNotEmpty()) KeyValueRow("Inhibited by", alert.inhibitedBy.joinToString(", "))
         }
 
         SectionCard("Labels", icon = Icons.AutoMirrored.Outlined.Label) {
@@ -269,7 +277,7 @@ private fun linksFor(alert: AlertEntity): List<AlertLink> = buildList {
     alert.annotations["runbook_url"]?.let { add(AlertLink("Runbook", it, Icons.AutoMirrored.Outlined.MenuBook)) }
     alert.annotations["dashboard_url"]?.let { add(AlertLink("Dashboard", it, Icons.Outlined.Dashboard)) }
     alert.generatorUrl?.let { add(AlertLink("Source", it, Icons.Outlined.QueryStats)) }
-    alert.externalUrl?.let { add(AlertLink("Alertmanager", it, Icons.AutoMirrored.Outlined.OpenInNew)) }
+    alert.alertmanagerUrl?.let { add(AlertLink("Alertmanager", it, Icons.AutoMirrored.Outlined.OpenInNew)) }
     alert.annotations
         .filterKeys { it != "runbook_url" && it != "dashboard_url" }
         .filterValues { it.startsWith("http://") || it.startsWith("https://") }

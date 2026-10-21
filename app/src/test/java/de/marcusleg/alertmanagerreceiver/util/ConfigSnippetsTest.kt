@@ -1,63 +1,32 @@
 package de.marcusleg.alertmanagerreceiver.util
 
 import de.marcusleg.alertmanagerreceiver.data.AppSettings
-import de.marcusleg.alertmanagerreceiver.data.AuthMode
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ConfigSnippetsTest {
-    private val url = "http://192.168.1.50:9095/webhook"
-
     @Test
-    fun `alertmanager yaml contains url and bearer credentials`() {
-        val yaml = ConfigSnippets.alertmanagerYaml(url, AppSettings(authMode = AuthMode.BEARER, bearerToken = "tok"))
-        assertTrue(yaml.contains("- url: $url"))
-        assertTrue(yaml.contains("send_resolved: true"))
-        assertTrue(yaml.contains("type: Bearer"))
-        assertTrue(yaml.contains("credentials: tok"))
-        assertFalse(yaml.contains("routes:"))
+    fun `route uses the default receiver name`() {
+        val yaml = ConfigSnippets.alertmanagerRoute(AppSettings())
+        assertTrue(yaml.contains("  - name: phone"))
+        assertTrue(yaml.contains("    - receiver: phone"))
+        assertTrue(yaml.contains("continue: true"))
     }
 
     @Test
-    fun `alertmanager yaml with basic auth and heartbeat route`() {
-        val settings = AppSettings(
-            authMode = AuthMode.BASIC, basicUsername = "u", basicPassword = "p",
-            heartbeatEnabled = true, heartbeatAlertName = "Watchdog", heartbeatTimeoutMinutes = 15,
-        )
-        val yaml = ConfigSnippets.alertmanagerYaml(url, settings)
-        assertTrue(yaml.contains("basic_auth:"))
-        assertTrue(yaml.contains("username: u"))
-        assertTrue(yaml.contains("matchers: [alertname=\"Watchdog\"]"))
-        assertTrue(yaml.contains("repeat_interval: 5m"))
-    }
-
-    @Test
-    fun `no auth emits no http_config`() {
-        val yaml = ConfigSnippets.alertmanagerYaml(url, AppSettings(authMode = AuthMode.NONE))
-        assertFalse(yaml.contains("http_config"))
-    }
-
-    @Test
-    fun `crd references a secret instead of inlining the token`() {
-        val crd = ConfigSnippets.alertmanagerConfigCrd(url, AppSettings(authMode = AuthMode.BEARER, bearerToken = "tok"))
-        assertTrue(crd.contains("kind: Secret"))
-        assertTrue(crd.contains("token: tok"))
+    fun `route and CRD follow the receiver filter`() {
+        val settings = AppSettings(receiverFilter = "monitoring/pager/oncall-phone, other")
+        assertTrue(ConfigSnippets.alertmanagerRoute(settings).contains("- receiver: oncall-phone"))
+        val crd = ConfigSnippets.alertmanagerConfigCrd(settings)
         assertTrue(crd.contains("kind: AlertmanagerConfig"))
-        assertTrue(crd.contains("key: token"))
-        assertEquals(1, Regex("tok\\b").findAll(crd).count())
+        assertTrue(crd.contains("    receiver: oncall-phone"))
+        assertTrue(crd.contains("    - name: oncall-phone"))
     }
 
     @Test
-    fun `heartbeat repeat interval stays well inside the timeout`() {
-        assertEquals(1, ConfigSnippets.heartbeatRepeatMinutes(AppSettings(heartbeatTimeoutMinutes = 2)))
-        assertEquals(10, ConfigSnippets.heartbeatRepeatMinutes(AppSettings(heartbeatTimeoutMinutes = 30)))
-        assertEquals(40, ConfigSnippets.heartbeatRepeatMinutes(AppSettings(heartbeatTimeoutMinutes = 120)))
-    }
-
-    @Test
-    fun `curl test uses the configured auth`() {
-        assertTrue(ConfigSnippets.curlTest(url, AppSettings(authMode = AuthMode.BASIC, basicUsername = "u", basicPassword = "p")).contains("-u 'u:p'"))
+    fun `oauth2-proxy args contain issuer and client`() {
+        val args = ConfigSnippets.oauth2ProxyArgs(AppSettings(oidcIssuer = " https://sso.lan/ ", oidcClientId = "amr"))
+        assertTrue(args.contains("--skip-jwt-bearer-tokens=true"))
+        assertTrue(args.contains("--extra-jwt-issuers=https://sso.lan/=amr"))
     }
 }

@@ -7,7 +7,7 @@ import android.util.Log
 import de.marcusleg.alertmanagerreceiver.container
 import kotlinx.coroutines.launch
 
-/** Restarts the receiver after a reboot or an app update if the user had it enabled. */
+/** Restarts monitoring after a reboot or an app update if the user had it enabled. */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action !in HANDLED) return
@@ -16,9 +16,10 @@ class BootReceiver : BroadcastReceiver() {
         container.scope.launch {
             try {
                 val settings = container.settingsRepository.current()
-                if (settings.serverEnabled && settings.startOnBoot) container.receiverController.start()
+                val wanted = intent.action == Intent.ACTION_MY_PACKAGE_REPLACED || settings.startOnBoot
+                if (settings.monitoringEnabled && wanted) container.monitorController.start()
             } catch (e: Exception) {
-                Log.w("BootReceiver", "Could not start receiver service", e)
+                Log.w("BootReceiver", "Could not start the monitor service", e)
             } finally {
                 pending.finish()
             }

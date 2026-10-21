@@ -28,6 +28,8 @@ android {
         targetSdk = 37
         versionCode = 1
         versionName = "1.0.0"
+        // OIDC redirect URI scheme (<applicationId>:/oauth2redirect), consumed by AppAuth's redirect activity.
+        manifestPlaceholders["appAuthRedirectScheme"] = "de.marcusleg.alertmanagerreceiver"
     }
 
     signingConfigs {
@@ -46,6 +48,7 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
+            manifestPlaceholders["appAuthRedirectScheme"] = "de.marcusleg.alertmanagerreceiver.debug"
         }
         release {
             isMinifyEnabled = true
@@ -70,7 +73,6 @@ android {
             excludes += setOf(
                 "/META-INF/{AL2.0,LGPL2.1}",
                 "/META-INF/INDEX.LIST",
-                "/META-INF/io.netty.versions.properties",
                 "/META-INF/*.kotlin_module",
             )
         }
@@ -105,12 +107,10 @@ dependencies {
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.datastore.preferences)
 
-    implementation(libs.ktor.server.core)
-    implementation(libs.ktor.server.cio)
+    implementation(libs.appauth)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
-    testImplementation(libs.ktor.server.test.host)
 }

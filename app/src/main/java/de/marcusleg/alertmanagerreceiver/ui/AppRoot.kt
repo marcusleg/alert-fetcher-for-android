@@ -11,10 +11,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.NotificationsActive
-import androidx.compose.material.icons.filled.Sensors
+import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.NotificationsActive
-import androidx.compose.material.icons.outlined.Sensors
+import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -45,28 +45,28 @@ import de.marcusleg.alertmanagerreceiver.ui.alerts.AlertsScreen
 import de.marcusleg.alertmanagerreceiver.ui.alerts.AlertsViewModel
 import de.marcusleg.alertmanagerreceiver.ui.detail.AlertDetailScreen
 import de.marcusleg.alertmanagerreceiver.ui.detail.AlertDetailViewModel
-import de.marcusleg.alertmanagerreceiver.ui.receiver.ReceiverScreen
-import de.marcusleg.alertmanagerreceiver.ui.receiver.ReceiverViewModel
+import de.marcusleg.alertmanagerreceiver.ui.connection.ConnectionScreen
+import de.marcusleg.alertmanagerreceiver.ui.connection.ConnectionViewModel
 import de.marcusleg.alertmanagerreceiver.ui.settings.SettingsScreen
 import de.marcusleg.alertmanagerreceiver.ui.settings.SettingsViewModel
 import kotlinx.serialization.Serializable
 
 @Serializable data object AlertsRoute
-@Serializable data object ReceiverRoute
+@Serializable data object ConnectionRoute
 @Serializable data object SettingsRoute
 @Serializable data class AlertDetailRoute(val fingerprint: String)
 
 sealed interface PendingNavigation {
     data class Alert(val fingerprint: String) : PendingNavigation
     data object Alerts : PendingNavigation
-    data object Receiver : PendingNavigation
+    data object Connection : PendingNavigation
 }
 
 private data class TopLevel(val route: Any, val label: String, val icon: ImageVector, val selectedIcon: ImageVector)
 
 private val TOP_LEVEL = listOf(
     TopLevel(AlertsRoute, "Alerts", Icons.Outlined.NotificationsActive, Icons.Filled.NotificationsActive),
-    TopLevel(ReceiverRoute, "Receiver", Icons.Outlined.Sensors, Icons.Filled.Sensors),
+    TopLevel(ConnectionRoute, "Connection", Icons.Outlined.Hub, Icons.Filled.Hub),
     TopLevel(SettingsRoute, "Settings", Icons.Outlined.Settings, Icons.Filled.Settings),
 )
 
@@ -90,7 +90,7 @@ fun AppRoot(
                 launchSingleTop = true
             }
             PendingNavigation.Alerts -> navController.navigate(AlertsRoute) { popUpTo(AlertsRoute) { inclusive = true } }
-            PendingNavigation.Receiver -> navController.navigate(ReceiverRoute) { popUpTo(AlertsRoute) }
+            PendingNavigation.Connection -> navController.navigate(ConnectionRoute) { popUpTo(AlertsRoute) }
             null -> return@LaunchedEffect
         }
         onNavigationHandled()
@@ -135,15 +135,15 @@ fun AppRoot(
                     AlertsScreen(
                         viewModel = viewModel { AlertsViewModel(container) },
                         onOpenAlert = { navController.navigate(AlertDetailRoute(it)) },
-                        onOpenReceiver = {
-                            navController.navigate(ReceiverRoute) {
+                        onOpenConnection = {
+                            navController.navigate(ConnectionRoute) {
                                 popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                                 launchSingleTop = true
                             }
                         },
                     )
                 }
-                composable<ReceiverRoute> { ReceiverScreen(viewModel { ReceiverViewModel(container) }) }
+                composable<ConnectionRoute> { ConnectionScreen(viewModel { ConnectionViewModel(container) }) }
                 composable<SettingsRoute> { SettingsScreen(viewModel { SettingsViewModel(container) }) }
                 composable<AlertDetailRoute> { entry ->
                     val route = entry.toRoute<AlertDetailRoute>()

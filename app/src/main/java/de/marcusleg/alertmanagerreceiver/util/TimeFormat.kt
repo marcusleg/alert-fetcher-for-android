@@ -7,6 +7,7 @@ import java.time.format.FormatStyle
 
 object TimeFormat {
     private val absolute = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM)
+    private val clock = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
 
     fun duration(millis: Long): String {
         val totalMinutes = (millis.coerceAtLeast(0) / 60_000)
@@ -27,4 +28,7 @@ object TimeFormat {
     }
 
     fun absolute(at: Long): String = absolute.format(Instant.ofEpochMilli(at).atZone(ZoneId.systemDefault()))
+
+    /** Time of day, e.g. "14:05", for texts that aren't refreshed (notifications). */
+    fun clock(at: Long): String = clock.format(Instant.ofEpochMilli(at).atZone(ZoneId.systemDefault()))
 }

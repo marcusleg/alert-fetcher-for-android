@@ -31,7 +31,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
                         )
                         withContext(Dispatchers.Main) { Toast.makeText(context, message, Toast.LENGTH_LONG).show() }
                     }
-                    ACTION_STOP_SERVER -> container.receiverController.setEnabled(false)
+                    ACTION_STOP -> container.monitorController.setEnabled(false)
                 }
             } finally {
                 pending.finish()
@@ -42,7 +42,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
     companion object {
         const val ACTION_ACK = "de.marcusleg.alertmanagerreceiver.action.ACK"
         const val ACTION_SILENCE = "de.marcusleg.alertmanagerreceiver.action.SILENCE"
-        const val ACTION_STOP_SERVER = "de.marcusleg.alertmanagerreceiver.action.STOP_SERVER"
+        const val ACTION_STOP = "de.marcusleg.alertmanagerreceiver.action.STOP"
         private const val EXTRA_FINGERPRINT = "fingerprint"
         private const val SILENCE_DURATION_MS = 60 * 60 * 1000L
 

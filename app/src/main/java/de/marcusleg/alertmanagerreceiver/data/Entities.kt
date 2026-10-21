@@ -8,7 +8,7 @@ import de.marcusleg.alertmanagerreceiver.model.Severity
 
 @Entity(
     tableName = "alerts",
-    indices = [Index("status"), Index("lastReceivedAt")],
+    indices = [Index("status"), Index("lastSeenAt")],
 )
 data class AlertEntity(
     @PrimaryKey val fingerprint: String,
@@ -20,16 +20,20 @@ data class AlertEntity(
     val startsAt: Long?,
     val endsAt: Long?,
     val generatorUrl: String?,
-    val externalUrl: String?,
-    val receiver: String?,
+    val alertmanagerUrl: String?,
+    val receivers: List<String>,
+    /** IDs of the Alertmanager silences currently muting the alert. */
+    val silencedBy: List<String> = emptyList(),
+    /** Fingerprints of the alerts currently inhibiting this one. */
+    val inhibitedBy: List<String> = emptyList(),
     /** When this device first saw the alert (in its current firing episode). */
-    val firstReceivedAt: Long,
-    /** When this device last received a notification containing the alert. */
-    val lastReceivedAt: Long,
-    /** When the status last changed (fired, re-fired or resolved). */
+    val firstSeenAt: Long,
+    /** When the alert was last returned by Alertmanager. */
+    val lastSeenAt: Long,
+    /** When the status last changed (fired, re-fired, suppressed or resolved). */
     val statusChangedAt: Long,
     val acknowledged: Boolean = false,
-    val silenceId: String? = null,
+    /** End of a silence created from this device, shown until Alertmanager reports it. */
     val silencedUntil: Long? = null,
 ) {
     val summary: String?
@@ -47,15 +51,16 @@ data class AlertEntity(
     }
 }
 
-@Entity(tableName = "deliveries", indices = [Index("receivedAt")])
-data class DeliveryEntity(
+/** One poll of the Alertmanager API, for the "Recent checks" log. */
+@Entity(tableName = "checks", indices = [Index("startedAt")])
+data class CheckEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val receivedAt: Long,
-    val remoteAddress: String,
-    val receiver: String?,
-    val groupStatus: String?,
-    val firing: Int,
-    val resolved: Int,
-    val httpStatus: Int,
-    val message: String?,
+    val startedAt: Long,
+    val durationMillis: Long,
+    val success: Boolean,
+    /** Alerts returned by Alertmanager (before filtering). */
+    val alertCount: Int = 0,
+    /** Alerts that are firing and not suppressed, after filtering. */
+    val firingCount: Int = 0,
+    val message: String? = null,
 )

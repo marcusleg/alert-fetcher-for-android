@@ -20,7 +20,8 @@ import de.marcusleg.alertmanagerreceiver.data.AlertChange
 import de.marcusleg.alertmanagerreceiver.data.AlertEntity
 import de.marcusleg.alertmanagerreceiver.data.AlertUpdate
 import de.marcusleg.alertmanagerreceiver.data.AppSettings
-import de.marcusleg.alertmanagerreceiver.model.AlertStatus
+import de.marcusleg.alertmanagerreceiver.data.MonitorState
+import de.marcusleg.alertmanagerreceiver.monitor.HealthEvent
 import de.marcusleg.alertmanagerreceiver.model.Severity
 import de.marcusleg.alertmanagerreceiver.util.TimeFormat
 
@@ -43,7 +44,7 @@ class AlertNotifier(private val context: Context) {
             },
             channel(CHANNEL_INFO, R.string.channel_info, R.string.channel_info_desc, NotificationManager.IMPORTANCE_DEFAULT, GROUP_ALERTS),
             channel(CHANNEL_RESOLVED, R.string.channel_resolved, R.string.channel_resolved_desc, NotificationManager.IMPORTANCE_LOW, GROUP_ALERTS),
-            channel(CHANNEL_HEARTBEAT, R.string.channel_heartbeat, R.string.channel_heartbeat_desc, NotificationManager.IMPORTANCE_HIGH, GROUP_SYSTEM) {
+            channel(CHANNEL_HEALTH, R.string.channel_health, R.string.channel_health_desc, NotificationManager.IMPORTANCE_HIGH, GROUP_SYSTEM) {
                 enableVibration(true)
             },
             channel(CHANNEL_SERVICE, R.string.channel_service, R.string.channel_service_desc, NotificationManager.IMPORTANCE_LOW, GROUP_SYSTEM) {
@@ -51,6 +52,8 @@ class AlertNotifier(private val context: Context) {
             },
         )
         nm.createNotificationChannels(channels)
+        // Channels of the webhook-server era.
+        listOf("heartbeat", "receiver_service").forEach(nm::deleteNotificationChannel)
     }
 
     private inline fun channel(
@@ -72,37 +75,41 @@ class AlertNotifier(private val context: Context) {
 
     fun handle(updates: List<AlertUpdate>, settings: AppSettings) {
         if (updates.isEmpty()) return
+        var changed = false
         for ((alert, change) in updates) {
             val wanted = alert.severity.isAtLeast(settings.minNotifySeverity)
             when (change) {
-                AlertChange.NEW_FIRING, AlertChange.REFIRED ->
-                    if (wanted) showFiring(alert, settings, onlyAlertOnce = false)
-                // Repeats are silent while the notification is still visible, but alert again if it was swiped away.
-                AlertChange.STILL_FIRING ->
-                    if (wanted && !alert.acknowledged) showFiring(alert, settings, onlyAlertOnce = true)
-                AlertChange.RESOLVED ->
-                    if (wanted && settings.notifyResolved) showResolved(alert) else cancel(alert.fingerprint)
-                AlertChange.STILL_RESOLVED -> Unit
+                AlertChange.NEW_FIRING, AlertChange.REFIRED, AlertChange.UNSUPPRESSED ->
+                    if (wanted) showFiring(alert, settings).also { changed = true }
+                // Unchanged; leave a swiped-away notification dismissed.
+                AlertChange.STILL_FIRING, AlertChange.STILL_SUPPRESSED -> Unit
+                AlertChange.SUPPRESSED, AlertChange.RESOLVED_QUIETLY -> {
+                    manager.cancel(alert.fingerprint, ID_ALERT)
+                    changed = true
+                }
+                AlertChange.RESOLVED -> {
+                    if (wanted && settings.notifyResolved) showResolved(alert) else manager.cancel(alert.fingerprint, ID_ALERT)
+                    changed = true
+                }
             }
         }
-        updateSummary()
+        if (changed) updateSummary()
     }
 
     @SuppressLint("MissingPermission")
-    fun showFiring(alert: AlertEntity, settings: AppSettings, onlyAlertOnce: Boolean) {
+    fun showFiring(alert: AlertEntity, settings: AppSettings) {
         if (!canPost()) return
         val builder = baseBuilder(alert, channelFor(alert.severity))
             .setContentTitle(alert.alertName)
             .setCategory(NotificationCompat.CATEGORY_ERROR)
             .setPriority(if (alert.severity == Severity.INFO) NotificationCompat.PRIORITY_DEFAULT else NotificationCompat.PRIORITY_HIGH)
-            .setOnlyAlertOnce(onlyAlertOnce)
-            .setWhen(alert.startsAt ?: alert.firstReceivedAt)
+            .setWhen(alert.startsAt ?: alert.firstSeenAt)
             .addAction(
                 R.drawable.ic_stat_check,
                 context.getString(R.string.action_acknowledge),
                 NotificationActionReceiver.intent(context, NotificationActionReceiver.ACTION_ACK, alert.fingerprint),
             )
-        if (settings.alertmanagerUrl.isNotBlank() || !alert.externalUrl.isNullOrBlank()) {
+        if (settings.isConfigured) {
             builder.addAction(
                 R.drawable.ic_stat_silence,
                 context.getString(R.string.action_silence_1h),
@@ -191,45 +198,73 @@ class AlertNotifier(private val context: Context) {
         manager.notify(ID_SUMMARY, summary)
     }
 
-    @SuppressLint("MissingPermission")
-    fun showHeartbeatMissing(alertName: String, lastSeenAt: Long?, timeoutMinutes: Int) {
-        if (!canPost()) return
-        val last = lastSeenAt?.let { context.getString(R.string.heartbeat_last_seen, TimeFormat.relative(it)) }
-            ?: context.getString(R.string.heartbeat_never_seen)
-        val notification = NotificationCompat.Builder(context, CHANNEL_HEARTBEAT)
-            .setSmallIcon(R.drawable.ic_stat_heartbeat)
-            .setColor(ContextCompat.getColor(context, R.color.severity_critical))
-            .setContentTitle(context.getString(R.string.heartbeat_missing_title, alertName))
-            .setContentText(last)
-            .setStyle(
-                NotificationCompat.BigTextStyle().bigText(
-                    context.resources.getQuantityString(R.plurals.heartbeat_missing_text, timeoutMinutes, timeoutMinutes, alertName) + "\n" + last,
-                ),
-            )
-            .setCategory(NotificationCompat.CATEGORY_ERROR)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setContentIntent(openAlertIntent(null))
-            .setAutoCancel(true)
-            .build()
-        manager.notify(ID_HEARTBEAT, notification)
+    /** Notifications about the monitoring path itself rather than about alerts. */
+    fun handleHealth(events: List<HealthEvent>, state: MonitorState, settings: AppSettings) {
+        for (event in events) {
+            when (event) {
+                HealthEvent.CONTACT_LOST -> showProblem(
+                    ID_CONNECTION,
+                    context.getString(R.string.health_contact_lost_title),
+                    listOfNotNull(
+                        state.lastSuccessAt?.let { context.getString(R.string.health_last_success, TimeFormat.clock(it)) }
+                            ?: context.getString(R.string.health_never_succeeded),
+                        state.lastError,
+                    ).joinToString("\n"),
+                )
+                HealthEvent.AUTH_FAILED -> showProblem(
+                    ID_CONNECTION,
+                    context.getString(R.string.health_auth_title),
+                    state.lastError ?: context.getString(R.string.health_auth_text),
+                )
+                HealthEvent.CONNECTION_RESTORED -> showRecovered(ID_CONNECTION, context.getString(R.string.health_restored_title))
+                HealthEvent.HEARTBEAT_MISSING -> showProblem(
+                    ID_HEARTBEAT,
+                    context.getString(R.string.heartbeat_missing_title, settings.heartbeatAlertName),
+                    context.resources.getQuantityString(
+                        R.plurals.heartbeat_missing_text,
+                        settings.effectiveStaleAfterMinutes,
+                        settings.effectiveStaleAfterMinutes,
+                        settings.heartbeatAlertName,
+                    ),
+                )
+                HealthEvent.HEARTBEAT_RESTORED ->
+                    showRecovered(ID_HEARTBEAT, context.getString(R.string.heartbeat_restored_title, settings.heartbeatAlertName))
+            }
+        }
     }
 
     @SuppressLint("MissingPermission")
-    fun showHeartbeatRestored(alertName: String) {
+    private fun showProblem(id: Int, title: String, text: String) {
+        if (!canPost()) return
+        val notification = NotificationCompat.Builder(context, CHANNEL_HEALTH)
+            .setSmallIcon(R.drawable.ic_stat_heartbeat)
+            .setColor(ContextCompat.getColor(context, R.color.severity_critical))
+            .setContentTitle(title)
+            .setContentText(text.lineSequence().first())
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setCategory(NotificationCompat.CATEGORY_ERROR)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(openAlertIntent(null, MainActivity.DESTINATION_CONNECTION))
+            .setAutoCancel(true)
+            .build()
+        manager.notify(id, notification)
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun showRecovered(id: Int, title: String) {
         if (!canPost()) return
         val notification = NotificationCompat.Builder(context, CHANNEL_RESOLVED)
             .setSmallIcon(R.drawable.ic_stat_heartbeat)
             .setColor(ContextCompat.getColor(context, R.color.resolved))
-            .setContentTitle(context.getString(R.string.heartbeat_restored_title, alertName))
-            .setContentText(context.getString(R.string.heartbeat_restored_text))
-            .setContentIntent(openAlertIntent(null))
+            .setContentTitle(title)
+            .setContentIntent(openAlertIntent(null, MainActivity.DESTINATION_CONNECTION))
             .setAutoCancel(true)
             .setTimeoutAfter(RESOLVED_TIMEOUT_MS)
             .build()
-        manager.notify(ID_HEARTBEAT, notification)
+        manager.notify(id, notification)
     }
 
-    fun serviceNotification(title: String, text: String): Notification =
+    fun serviceNotification(title: String, text: String?): Notification =
         NotificationCompat.Builder(context, CHANNEL_SERVICE)
             .setSmallIcon(R.drawable.ic_stat_receiver)
             .setColor(ContextCompat.getColor(context, R.color.brand))
@@ -240,11 +275,11 @@ class AlertNotifier(private val context: Context) {
             .setShowWhen(false)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-            .setContentIntent(openAlertIntent(null, MainActivity.DESTINATION_RECEIVER))
+            .setContentIntent(openAlertIntent(null, MainActivity.DESTINATION_CONNECTION))
             .addAction(
                 R.drawable.ic_stat_stop,
                 context.getString(R.string.action_stop),
-                NotificationActionReceiver.intent(context, NotificationActionReceiver.ACTION_STOP_SERVER, null),
+                NotificationActionReceiver.intent(context, NotificationActionReceiver.ACTION_STOP, null),
             )
             .build()
 
@@ -263,8 +298,8 @@ class AlertNotifier(private val context: Context) {
         const val CHANNEL_WARNING = "alerts_warning"
         const val CHANNEL_INFO = "alerts_info"
         const val CHANNEL_RESOLVED = "alerts_resolved"
-        const val CHANNEL_HEARTBEAT = "heartbeat"
-        const val CHANNEL_SERVICE = "receiver_service"
+        const val CHANNEL_HEALTH = "monitoring_health"
+        const val CHANNEL_SERVICE = "monitor_service"
 
         private const val GROUP_ALERTS = "alerts"
         private const val GROUP_SYSTEM = "system"
@@ -273,6 +308,7 @@ class AlertNotifier(private val context: Context) {
         const val ID_SERVICE = 1
         private const val ID_SUMMARY = 2
         private const val ID_HEARTBEAT = 3
+        private const val ID_CONNECTION = 4
         private const val ID_ALERT = 100
 
         private const val RESOLVED_TIMEOUT_MS = 6 * 60 * 60 * 1000L
@@ -289,7 +325,5 @@ class AlertNotifier(private val context: Context) {
             Severity.INFO -> R.color.severity_info
         }
 
-        fun statusColor(alert: AlertEntity) =
-            if (alert.status == AlertStatus.RESOLVED) R.color.resolved else severityColor(alert.severity)
     }
 }

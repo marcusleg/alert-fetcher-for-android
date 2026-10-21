@@ -4,9 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import de.marcusleg.alertmanagerreceiver.AppContainer
 import de.marcusleg.alertmanagerreceiver.data.AlertEntity
+import de.marcusleg.alertmanagerreceiver.data.AppSettings
+import de.marcusleg.alertmanagerreceiver.data.MonitorState
 import de.marcusleg.alertmanagerreceiver.model.AlertStatus
 import de.marcusleg.alertmanagerreceiver.model.Severity
-import de.marcusleg.alertmanagerreceiver.server.ServerState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -14,17 +15,21 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-enum class AlertFilter(val label: String) { FIRING("Firing"), RESOLVED("Resolved"), ALL("All") }
+enum class AlertFilter(val label: String, val status: AlertStatus) {
+    FIRING("Firing", AlertStatus.FIRING),
+    SILENCED("Silenced", AlertStatus.SUPPRESSED),
+    RESOLVED("Resolved", AlertStatus.RESOLVED),
+}
 
 data class AlertsUiState(
     val loading: Boolean = true,
     val alerts: List<AlertEntity> = emptyList(),
     val filter: AlertFilter = AlertFilter.FIRING,
-    val firingCount: Int = 0,
-    val resolvedCount: Int = 0,
+    val counts: Map<AlertStatus, Int> = emptyMap(),
     val firingBySeverity: Map<Severity, Int> = emptyMap(),
-    val serverEnabled: Boolean = true,
-    val serverState: ServerState = ServerState.Stopped,
+    val settings: AppSettings = AppSettings(),
+    val monitor: MonitorState = MonitorState(),
+    val refreshing: Boolean = false,
 )
 
 class AlertsViewModel(private val container: AppContainer) : ViewModel() {
@@ -34,27 +39,32 @@ class AlertsViewModel(private val container: AppContainer) : ViewModel() {
         container.alertRepository.observeAlerts(),
         filter,
         container.settingsRepository.settingsFlow,
-        container.webhookServer.state,
-    ) { all, filter, settings, serverState ->
-        val firing = all.filter { it.status == AlertStatus.FIRING }
+        container.settingsRepository.monitorStateFlow,
+        container.poller.polling,
+    ) { all, filter, settings, monitor, polling ->
+        val byStatus = all.groupBy { it.status }
         AlertsUiState(
             loading = false,
-            alerts = when (filter) {
-                AlertFilter.FIRING -> firing
-                AlertFilter.RESOLVED -> all.filter { it.status == AlertStatus.RESOLVED }
-                AlertFilter.ALL -> all
-            },
+            alerts = byStatus[filter.status].orEmpty(),
             filter = filter,
-            firingCount = firing.size,
-            resolvedCount = all.size - firing.size,
-            firingBySeverity = firing.groupingBy { it.severity }.eachCount(),
-            serverEnabled = settings.serverEnabled,
-            serverState = serverState,
+            counts = byStatus.mapValues { it.value.size },
+            firingBySeverity = byStatus[AlertStatus.FIRING].orEmpty().groupingBy { it.severity }.eachCount(),
+            settings = settings,
+            monitor = monitor,
+            refreshing = polling,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AlertsUiState())
 
     fun setFilter(value: AlertFilter) {
         filter.value = value
+    }
+
+    fun refresh() {
+        viewModelScope.launch {
+            // While monitoring is off a manual refresh still checks once.
+            if (container.settingsRepository.current().monitoringEnabled) container.monitorController.checkNow()
+            else container.poller.poll()
+        }
     }
 
     fun clearResolved() {
@@ -70,7 +80,7 @@ class AlertsViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
-    fun startReceiver() {
-        viewModelScope.launch { container.receiverController.setEnabled(true) }
+    fun startMonitoring() {
+        viewModelScope.launch { container.monitorController.setEnabled(true) }
     }
 }

@@ -12,7 +12,7 @@ interface AlertDao {
     @Query(
         """
         SELECT * FROM alerts
-        ORDER BY CASE status WHEN 'FIRING' THEN 0 ELSE 1 END,
+        ORDER BY CASE status WHEN 'FIRING' THEN 0 WHEN 'SUPPRESSED' THEN 1 ELSE 2 END,
                  CASE severity WHEN 'CRITICAL' THEN 0 WHEN 'WARNING' THEN 1 ELSE 2 END,
                  statusChangedAt DESC
         """
@@ -24,6 +24,9 @@ interface AlertDao {
 
     @Query("SELECT * FROM alerts WHERE fingerprint = :fingerprint")
     suspend fun get(fingerprint: String): AlertEntity?
+
+    @Query("SELECT * FROM alerts WHERE status != 'RESOLVED'")
+    suspend fun active(): List<AlertEntity>
 
     @Query("SELECT COUNT(*) FROM alerts WHERE status = :status")
     fun observeCount(status: AlertStatus): Flow<Int>
@@ -37,8 +40,8 @@ interface AlertDao {
     @Query("UPDATE alerts SET acknowledged = :acknowledged WHERE fingerprint = :fingerprint")
     suspend fun setAcknowledged(fingerprint: String, acknowledged: Boolean)
 
-    @Query("UPDATE alerts SET silenceId = :silenceId, silencedUntil = :until, acknowledged = 1 WHERE fingerprint = :fingerprint")
-    suspend fun setSilenced(fingerprint: String, silenceId: String, until: Long)
+    @Query("UPDATE alerts SET silencedUntil = :until, acknowledged = 1 WHERE fingerprint = :fingerprint")
+    suspend fun setSilenced(fingerprint: String, until: Long)
 
     @Query("DELETE FROM alerts WHERE fingerprint = :fingerprint")
     suspend fun delete(fingerprint: String)
@@ -54,19 +57,16 @@ interface AlertDao {
 }
 
 @Dao
-interface DeliveryDao {
+interface CheckDao {
     @Insert
-    suspend fun insert(delivery: DeliveryEntity): Long
+    suspend fun insert(check: CheckEntity): Long
 
-    @Query("SELECT * FROM deliveries ORDER BY receivedAt DESC LIMIT :limit")
-    fun observeRecent(limit: Int = 50): Flow<List<DeliveryEntity>>
+    @Query("SELECT * FROM checks ORDER BY startedAt DESC LIMIT :limit")
+    fun observeRecent(limit: Int = 50): Flow<List<CheckEntity>>
 
-    @Query("SELECT * FROM deliveries WHERE httpStatus BETWEEN 200 AND 299 ORDER BY receivedAt DESC LIMIT 1")
-    fun observeLastSuccess(): Flow<DeliveryEntity?>
-
-    @Query("DELETE FROM deliveries WHERE id NOT IN (SELECT id FROM deliveries ORDER BY receivedAt DESC LIMIT :keep)")
+    @Query("DELETE FROM checks WHERE id NOT IN (SELECT id FROM checks ORDER BY startedAt DESC LIMIT :keep)")
     suspend fun trim(keep: Int = 200)
 
-    @Query("DELETE FROM deliveries")
+    @Query("DELETE FROM checks")
     suspend fun deleteAll()
 }

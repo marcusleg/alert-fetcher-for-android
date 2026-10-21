@@ -1,12 +1,12 @@
 {
   "formatVersion": 1,
   "database": {
-    "version": 1,
-    "identityHash": "7138953692e69d8d3c56f7819e1d5a90",
+    "version": 2,
+    "identityHash": "0bc5aac09f69d3987aa54ed841899017",
     "entities": [
       {
         "tableName": "alerts",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`fingerprint` TEXT NOT NULL, `alertName` TEXT NOT NULL, `status` TEXT NOT NULL, `severity` TEXT NOT NULL, `labels` TEXT NOT NULL, `annotations` TEXT NOT NULL, `startsAt` INTEGER, `endsAt` INTEGER, `generatorUrl` TEXT, `externalUrl` TEXT, `receiver` TEXT, `firstReceivedAt` INTEGER NOT NULL, `lastReceivedAt` INTEGER NOT NULL, `statusChangedAt` INTEGER NOT NULL, `acknowledged` INTEGER NOT NULL, `silenceId` TEXT, `silencedUntil` INTEGER, PRIMARY KEY(`fingerprint`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`fingerprint` TEXT NOT NULL, `alertName` TEXT NOT NULL, `status` TEXT NOT NULL, `severity` TEXT NOT NULL, `labels` TEXT NOT NULL, `annotations` TEXT NOT NULL, `startsAt` INTEGER, `endsAt` INTEGER, `generatorUrl` TEXT, `alertmanagerUrl` TEXT, `receivers` TEXT NOT NULL, `silencedBy` TEXT NOT NULL, `inhibitedBy` TEXT NOT NULL, `firstSeenAt` INTEGER NOT NULL, `lastSeenAt` INTEGER NOT NULL, `statusChangedAt` INTEGER NOT NULL, `acknowledged` INTEGER NOT NULL, `silencedUntil` INTEGER, PRIMARY KEY(`fingerprint`))",
         "fields": [
           {
             "fieldPath": "fingerprint",
@@ -60,24 +60,37 @@
             "affinity": "TEXT"
           },
           {
-            "fieldPath": "externalUrl",
-            "columnName": "externalUrl",
+            "fieldPath": "alertmanagerUrl",
+            "columnName": "alertmanagerUrl",
             "affinity": "TEXT"
           },
           {
-            "fieldPath": "receiver",
-            "columnName": "receiver",
-            "affinity": "TEXT"
+            "fieldPath": "receivers",
+            "columnName": "receivers",
+            "affinity": "TEXT",
+            "notNull": true
           },
           {
-            "fieldPath": "firstReceivedAt",
-            "columnName": "firstReceivedAt",
+            "fieldPath": "silencedBy",
+            "columnName": "silencedBy",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "inhibitedBy",
+            "columnName": "inhibitedBy",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "firstSeenAt",
+            "columnName": "firstSeenAt",
             "affinity": "INTEGER",
             "notNull": true
           },
           {
-            "fieldPath": "lastReceivedAt",
-            "columnName": "lastReceivedAt",
+            "fieldPath": "lastSeenAt",
+            "columnName": "lastSeenAt",
             "affinity": "INTEGER",
             "notNull": true
           },
@@ -92,11 +105,6 @@
             "columnName": "acknowledged",
             "affinity": "INTEGER",
             "notNull": true
-          },
-          {
-            "fieldPath": "silenceId",
-            "columnName": "silenceId",
-            "affinity": "TEXT"
           },
           {
             "fieldPath": "silencedUntil",
@@ -121,19 +129,19 @@
             "createSql": "CREATE INDEX IF NOT EXISTS `index_alerts_status` ON `${TABLE_NAME}` (`status`)"
           },
           {
-            "name": "index_alerts_lastReceivedAt",
+            "name": "index_alerts_lastSeenAt",
             "unique": false,
             "columnNames": [
-              "lastReceivedAt"
+              "lastSeenAt"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_alerts_lastReceivedAt` ON `${TABLE_NAME}` (`lastReceivedAt`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_alerts_lastSeenAt` ON `${TABLE_NAME}` (`lastSeenAt`)"
           }
         ]
       },
       {
-        "tableName": "deliveries",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `receivedAt` INTEGER NOT NULL, `remoteAddress` TEXT NOT NULL, `receiver` TEXT, `groupStatus` TEXT, `firing` INTEGER NOT NULL, `resolved` INTEGER NOT NULL, `httpStatus` INTEGER NOT NULL, `message` TEXT)",
+        "tableName": "checks",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `startedAt` INTEGER NOT NULL, `durationMillis` INTEGER NOT NULL, `success` INTEGER NOT NULL, `alertCount` INTEGER NOT NULL, `firingCount` INTEGER NOT NULL, `message` TEXT)",
         "fields": [
           {
             "fieldPath": "id",
@@ -142,42 +150,32 @@
             "notNull": true
           },
           {
-            "fieldPath": "receivedAt",
-            "columnName": "receivedAt",
+            "fieldPath": "startedAt",
+            "columnName": "startedAt",
             "affinity": "INTEGER",
             "notNull": true
           },
           {
-            "fieldPath": "remoteAddress",
-            "columnName": "remoteAddress",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "receiver",
-            "columnName": "receiver",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "groupStatus",
-            "columnName": "groupStatus",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "firing",
-            "columnName": "firing",
+            "fieldPath": "durationMillis",
+            "columnName": "durationMillis",
             "affinity": "INTEGER",
             "notNull": true
           },
           {
-            "fieldPath": "resolved",
-            "columnName": "resolved",
+            "fieldPath": "success",
+            "columnName": "success",
             "affinity": "INTEGER",
             "notNull": true
           },
           {
-            "fieldPath": "httpStatus",
-            "columnName": "httpStatus",
+            "fieldPath": "alertCount",
+            "columnName": "alertCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "firingCount",
+            "columnName": "firingCount",
             "affinity": "INTEGER",
             "notNull": true
           },
@@ -195,20 +193,20 @@
         },
         "indices": [
           {
-            "name": "index_deliveries_receivedAt",
+            "name": "index_checks_startedAt",
             "unique": false,
             "columnNames": [
-              "receivedAt"
+              "startedAt"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_deliveries_receivedAt` ON `${TABLE_NAME}` (`receivedAt`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_checks_startedAt` ON `${TABLE_NAME}` (`startedAt`)"
           }
         ]
       }
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '7138953692e69d8d3c56f7819e1d5a90')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '0bc5aac09f69d3987aa54ed841899017')"
     ]
   }
 }

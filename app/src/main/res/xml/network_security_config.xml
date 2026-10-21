@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Homelab Alertmanager instances commonly run over plain HTTP on the LAN or a VPN,
-     so cleartext is permitted for the outgoing silence API calls. -->
+<!-- All traffic (Alertmanager API, identity provider) must use HTTPS. -->
 <network-security-config xmlns:tools="http://schemas.android.com/tools">
-    <base-config cleartextTrafficPermitted="true" tools:ignore="InsecureBaseConfiguration">
+    <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
-            <!-- Allows private CAs installed by the user (common in homelabs). -->
+            <!-- Homelabs often use a private CA; it has to be installed on the phone deliberately. -->
             <certificates src="user" tools:ignore="AcceptsUserCertificates" />
         </trust-anchors>
     </base-config>

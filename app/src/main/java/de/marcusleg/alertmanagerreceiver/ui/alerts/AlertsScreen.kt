@@ -24,10 +24,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.DoneAll
-import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.NotificationsOff
-import androidx.compose.material.icons.outlined.SensorsOff
+import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.Hub
+import androidx.compose.material.icons.outlined.Key
+import androidx.compose.material.icons.outlined.SyncDisabled
 import androidx.compose.material.icons.outlined.TaskAlt
 import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material3.Card
@@ -46,6 +48,7 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -65,7 +68,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.marcusleg.alertmanagerreceiver.data.AlertEntity
 import de.marcusleg.alertmanagerreceiver.model.AlertStatus
 import de.marcusleg.alertmanagerreceiver.model.Severity
-import de.marcusleg.alertmanagerreceiver.server.ServerState
 import de.marcusleg.alertmanagerreceiver.ui.components.LabelChip
 import de.marcusleg.alertmanagerreceiver.ui.components.Pill
 import de.marcusleg.alertmanagerreceiver.ui.components.alertColor
@@ -78,7 +80,7 @@ import kotlinx.coroutines.delay
 fun AlertsScreen(
     viewModel: AlertsViewModel,
     onOpenAlert: (String) -> Unit,
-    onOpenReceiver: () -> Unit,
+    onOpenConnection: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val now by rememberTicker()
@@ -109,53 +111,80 @@ fun AlertsScreen(
             )
         },
     ) { padding ->
-        LazyColumn(
+        PullToRefreshBox(
+            isRefreshing = state.refreshing,
+            onRefresh = viewModel::refresh,
             modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            if (!state.loading) {
-                receiverBanner(state, viewModel::startReceiver, onOpenReceiver)?.let { banner -> item(key = "banner") { banner() } }
-            }
-            item(key = "stats") { SeverityStats(state) }
-            item(key = "filter") {
-                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                    AlertFilter.entries.forEachIndexed { index, filter ->
-                        val count = when (filter) {
-                            AlertFilter.FIRING -> state.firingCount
-                            AlertFilter.RESOLVED -> state.resolvedCount
-                            AlertFilter.ALL -> state.firingCount + state.resolvedCount
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                if (!state.loading) {
+                    statusBanner(state, viewModel::startMonitoring, onOpenConnection)?.let { banner -> item(key = "banner") { banner() } }
+                }
+                item(key = "stats") { SeverityStats(state) }
+                item(key = "filter") {
+                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                        AlertFilter.entries.forEachIndexed { index, filter ->
+                            val count = state.counts[filter.status] ?: 0
+                            SegmentedButton(
+                                selected = state.filter == filter,
+                                onClick = { viewModel.setFilter(filter) },
+                                shape = SegmentedButtonDefaults.itemShape(index, AlertFilter.entries.size),
+                            ) { Text("${filter.label} ($count)") }
                         }
-                        SegmentedButton(
-                            selected = state.filter == filter,
-                            onClick = { viewModel.setFilter(filter) },
-                            shape = SegmentedButtonDefaults.itemShape(index, AlertFilter.entries.size),
-                        ) { Text("${filter.label} ($count)") }
                     }
                 }
-            }
-            if (state.alerts.isEmpty() && !state.loading) {
-                item(key = "empty") { EmptyState(state.filter) }
-            }
-            items(state.alerts, key = { it.fingerprint }) { alert ->
-                AlertCard(alert, now, onClick = { onOpenAlert(alert.fingerprint) }, modifier = Modifier.animateItem())
+                if (state.alerts.isEmpty() && !state.loading) {
+                    item(key = "empty") { EmptyState(state.filter) }
+                }
+                items(state.alerts, key = { it.fingerprint }) { alert ->
+                    AlertCard(alert, now, onClick = { onOpenAlert(alert.fingerprint) }, modifier = Modifier.animateItem())
+                }
+                if (!state.loading && state.settings.isConfigured) {
+                    item(key = "checked") { LastChecked(state, now) }
+                }
             }
         }
     }
 }
 
-private fun receiverBanner(
+@Composable
+private fun LastChecked(state: AlertsUiState, now: Long) {
+    val last = state.monitor.lastSuccessAt
+    Text(
+        buildString {
+            append(if (last != null) "Checked ${TimeFormat.relative(last, now)}" else "Not checked yet")
+            if (state.settings.monitoringEnabled) append(" · every ${state.settings.pollIntervalMinutes} min")
+            append(" · pull down to refresh")
+        },
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+    )
+}
+
+private fun statusBanner(
     state: AlertsUiState,
     onStart: () -> Unit,
-    onOpenReceiver: () -> Unit,
+    onOpenConnection: () -> Unit,
 ): (@Composable () -> Unit)? {
-    val serverState = state.serverState
+    val monitor = state.monitor
     return when {
-        !state.serverEnabled -> {
-            { Banner(Icons.Outlined.SensorsOff, "Receiver is off", "Alertmanager can't reach this device.", "Start", onStart) }
+        !state.settings.isConfigured -> {
+            { Banner(Icons.Outlined.Hub, "Not connected", "Connect to your Alertmanager to see its alerts.", "Set up", onOpenConnection) }
         }
-        serverState is ServerState.Failed -> {
-            { Banner(Icons.Outlined.ErrorOutline, "Receiver failed to start", serverState.message, "Details", onOpenReceiver) }
+        !state.settings.monitoringEnabled -> {
+            { Banner(Icons.Outlined.SyncDisabled, "Monitoring is off", "You won't be notified about new alerts.", "Start", onStart) }
+        }
+        monitor.authProblem -> {
+            { Banner(Icons.Outlined.Key, "Sign-in required", monitor.lastError.orEmpty(), "Fix", onOpenConnection) }
+        }
+        monitor.lastCheckFailed -> {
+            { Banner(Icons.Outlined.CloudOff, "Can't reach Alertmanager", monitor.lastError.orEmpty(), "Details", onOpenConnection) }
         }
         else -> null
     }
@@ -245,7 +274,7 @@ fun AlertCard(alert: AlertEntity, now: Long, onClick: () -> Unit, modifier: Modi
                     Spacer(Modifier.width(8.dp))
                     Text(
                         if (resolved) "resolved ${TimeFormat.relative(alert.endsAt ?: alert.statusChangedAt, now)}"
-                        else TimeFormat.duration(now - (alert.startsAt ?: alert.firstReceivedAt)),
+                        else TimeFormat.duration(now - (alert.startsAt ?: alert.firstSeenAt)),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -260,7 +289,13 @@ fun AlertCard(alert: AlertEntity, now: Long, onClick: () -> Unit, modifier: Modi
                     } else {
                         Pill(alert.severity.label, color)
                     }
-                    if (alert.silencedUntil != null && alert.silencedUntil > now) {
+                    if (alert.status == AlertStatus.SUPPRESSED) {
+                        Pill(
+                            if (alert.silencedBy.isEmpty() && alert.inhibitedBy.isNotEmpty()) "Inhibited" else "Silenced",
+                            MaterialTheme.colorScheme.secondary,
+                            icon = Icons.Outlined.NotificationsOff,
+                        )
+                    } else if (alert.silencedUntil != null && alert.silencedUntil > now && !resolved) {
                         Pill("Silenced", MaterialTheme.colorScheme.secondary, icon = Icons.Outlined.NotificationsOff)
                     } else if (alert.acknowledged && !resolved) {
                         Pill("Acknowledged", MaterialTheme.colorScheme.secondary, icon = Icons.Outlined.TaskAlt)
@@ -291,14 +326,18 @@ private fun EmptyState(filter: AlertFilter) {
         Text(
             when (filter) {
                 AlertFilter.FIRING -> "All quiet"
+                AlertFilter.SILENCED -> "Nothing silenced"
                 AlertFilter.RESOLVED -> "No resolved alerts"
-                AlertFilter.ALL -> "No alerts yet"
             },
             style = MaterialTheme.typography.titleLarge,
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            if (filter == AlertFilter.FIRING) "Nothing is firing right now." else "Alerts sent by Alertmanager show up here.",
+            when (filter) {
+                AlertFilter.FIRING -> "Nothing is firing right now."
+                AlertFilter.SILENCED -> "Alerts silenced or inhibited in Alertmanager show up here."
+                AlertFilter.RESOLVED -> "Alerts that stopped firing show up here."
+            },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,

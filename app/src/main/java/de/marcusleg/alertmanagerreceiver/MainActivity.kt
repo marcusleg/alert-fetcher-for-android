@@ -33,7 +33,7 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         // Brings the service back if the system killed it while the app was in the background.
-        lifecycleScope.launch { container.receiverController.ensureRunningIfEnabled() }
+        lifecycleScope.launch { container.monitorController.ensureRunningIfEnabled() }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -46,7 +46,7 @@ class MainActivity : ComponentActivity() {
         val destination = intent?.getStringExtra(EXTRA_DESTINATION)
         pendingNavigation.value = when {
             fingerprint != null -> PendingNavigation.Alert(fingerprint)
-            destination == DESTINATION_RECEIVER -> PendingNavigation.Receiver
+            destination == DESTINATION_CONNECTION -> PendingNavigation.Connection
             intent?.hasExtra(EXTRA_DESTINATION) == true || intent?.hasExtra(EXTRA_FINGERPRINT) == true -> PendingNavigation.Alerts
             else -> null
         }
@@ -55,6 +55,6 @@ class MainActivity : ComponentActivity() {
     companion object {
         const val EXTRA_FINGERPRINT = "fingerprint"
         const val EXTRA_DESTINATION = "destination"
-        const val DESTINATION_RECEIVER = "receiver"
+        const val DESTINATION_CONNECTION = "connection"
     }
 }

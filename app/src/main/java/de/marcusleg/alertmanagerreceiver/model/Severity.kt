@@ -28,10 +28,10 @@ enum class Severity(val label: String) {
 
 enum class AlertStatus {
     FIRING,
-    RESOLVED;
 
-    companion object {
-        fun fromString(value: String?): AlertStatus =
-            if (value.equals("resolved", ignoreCase = true)) RESOLVED else FIRING
-    }
+    /** Still active in Alertmanager but silenced or inhibited there. */
+    SUPPRESSED,
+
+    /** No longer returned by Alertmanager. */
+    RESOLVED,
 }

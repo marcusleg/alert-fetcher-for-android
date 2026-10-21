@@ -24,12 +24,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -39,6 +43,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,7 +52,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -59,7 +69,11 @@ import de.marcusleg.alertmanagerreceiver.ui.theme.MonoFamily
 @Composable
 fun alertColor(alert: AlertEntity): Color {
     val colors = LocalStatusColors.current
-    return if (alert.status == AlertStatus.RESOLVED) colors.resolved else colors.forSeverity(alert.severity)
+    return when (alert.status) {
+        AlertStatus.FIRING -> colors.forSeverity(alert.severity)
+        AlertStatus.SUPPRESSED -> MaterialTheme.colorScheme.outline
+        AlertStatus.RESOLVED -> colors.resolved
+    }
 }
 
 /** Small rounded label, used for severity / status / label chips. */
@@ -224,6 +238,56 @@ fun <T> ChoiceRow(
             confirmButton = { TextButton(onClick = { open = false }) { Text("Cancel") } },
         )
     }
+}
+
+/**
+ * Text field for a persisted setting: keeps its own editing state and reports every change.
+ * [validate] returns an error message for the current text, or null.
+ */
+@Composable
+fun SettingTextField(
+    label: String,
+    value: String,
+    onChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    supporting: String? = null,
+    placeholder: String? = null,
+    secret: Boolean = false,
+    singleLine: Boolean = true,
+    keyboardType: KeyboardType = KeyboardType.Text,
+    mono: Boolean = false,
+    validate: (String) -> String? = { null },
+) {
+    var text by rememberSaveable { mutableStateOf(value) }
+    var visible by rememberSaveable { mutableStateOf(false) }
+    val error = validate(text)
+    OutlinedTextField(
+        value = text,
+        onValueChange = { text = it; onChange(it) },
+        label = { Text(label) },
+        placeholder = placeholder?.let { { Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis) } },
+        supportingText = (error ?: supporting)?.let { { Text(it) } },
+        isError = error != null,
+        singleLine = singleLine,
+        minLines = if (singleLine) 1 else 3,
+        textStyle = if (mono) MaterialTheme.typography.bodyMedium.copy(fontFamily = MonoFamily) else LocalTextStyle.current,
+        visualTransformation = if (secret && !visible) PasswordVisualTransformation() else VisualTransformation.None,
+        keyboardOptions = KeyboardOptions(
+            keyboardType = if (secret) KeyboardType.Password else keyboardType,
+            autoCorrectEnabled = false,
+            capitalization = KeyboardCapitalization.None,
+        ),
+        trailingIcon = if (secret) {
+            {
+                IconButton(onClick = { visible = !visible }) {
+                    Icon(if (visible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility, contentDescription = if (visible) "Hide" else "Show")
+                }
+            }
+        } else {
+            null
+        },
+        modifier = modifier.fillMaxWidth(),
+    )
 }
 
 @Composable
