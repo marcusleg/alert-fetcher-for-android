@@ -41,8 +41,8 @@ sed "s|\${DEX_PASSWORD_HASH}|$DEX_PASSWORD_HASH|" dex.yaml > "$STATE/dex.yaml"
   --config.file=/etc/alertmanager/alertmanager.yml --web.listen-address=127.0.0.1:9093 \
   --cluster.listen-address= --web.external-url=https://localhost:9443 >/dev/null
 
-"$ENGINE" run -d --name amr-dex --network host -v "$STATE:/state:ro,Z" \
-  ghcr.io/dexidp/dex:v2.46.0 dex serve /state/dex.yaml >/dev/null
+"$ENGINE" run -d --name amr-dex --network host -v "$STATE:/state:ro,Z" --tmpfs /var/dex:mode=1777 \
+  ghcr.io/dexidp/dex:v2.45.1 dex serve /state/dex.yaml >/dev/null
 
 "$ENGINE" run -d --name amr-caddy --network host -v "$STATE:/state:ro,Z" -v "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro,Z" \
   -e BASIC_PASSWORD_HASH="$BASIC_PASSWORD_HASH" docker.io/library/caddy:2.10 >/dev/null

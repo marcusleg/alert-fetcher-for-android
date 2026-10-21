@@ -1,7 +1,10 @@
 # Dex as a stand-in for Keycloak / Authentik / Authelia / Zitadel.
 issuer: https://localhost:5556/dex
 storage:
-  type: memory
+  # Dex's memory storage hung on refresh-token requests in testing; SQLite is reliable.
+  type: sqlite3
+  config:
+    file: /var/dex/dex.db
 web:
   https: 0.0.0.0:5556
   tlsCert: /state/tls.crt
