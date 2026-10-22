@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="brand">#3F51B5</color>
-    <color name="severity_critical">#D32F2F</color>
-    <color name="severity_warning">#E65100</color>
-    <color name="severity_info">#1E88E5</color>
-    <color name="resolved">#2E7D32</color>
-    <color name="window_background">#FBF8FF</color>
+    <!-- Notification accents; kept in sync with the light theme in ui/theme/Theme.kt -->
+    <color name="brand">#7143BE</color>
+    <color name="severity_critical">#D9005E</color>
+    <color name="severity_warning">#A35D00</color>
+    <color name="severity_info">#00798A</color>
+    <color name="resolved">#477210</color>
+    <color name="window_background">#FCF9F4</color>
 </resources>

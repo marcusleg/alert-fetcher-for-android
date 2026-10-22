@@ -50,6 +50,7 @@ import androidx.lifecycle.compose.currentStateAsState
 import de.marcusleg.alertfetcher.BuildConfig
 import de.marcusleg.alertfetcher.data.AppSettings
 import de.marcusleg.alertfetcher.model.Severity
+import de.marcusleg.alertfetcher.ui.components.BrandRule
 import de.marcusleg.alertfetcher.ui.components.ChoiceRow
 import de.marcusleg.alertfetcher.ui.components.SectionCard
 import de.marcusleg.alertfetcher.ui.components.SwitchRow
@@ -62,7 +63,14 @@ const val PROJECT_URL = "https://github.com/marcusleg/alert-fetcher-for-android"
 @Composable
 fun SettingsScreen(viewModel: SettingsViewModel) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
-    Scaffold(topBar = { TopAppBar(title = { Text("Settings") }) }) { padding ->
+    Scaffold(
+        topBar = {
+            Column {
+                TopAppBar(title = { Text("Settings") })
+                BrandRule()
+            }
+        },
+    ) { padding ->
         val s = settings ?: return@Scaffold
         Column(
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())

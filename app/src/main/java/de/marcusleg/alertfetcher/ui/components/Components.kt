@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -48,6 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -63,8 +65,22 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import de.marcusleg.alertfetcher.data.AlertEntity
 import de.marcusleg.alertfetcher.model.AlertStatus
+import de.marcusleg.alertfetcher.ui.theme.BrandGradient
 import de.marcusleg.alertfetcher.ui.theme.LocalStatusColors
 import de.marcusleg.alertfetcher.ui.theme.MonoFamily
+
+/** The purple → orange → pink rule from marcusleg.de's header, shown under each screen's top app bar. */
+@Composable
+fun BrandRule(modifier: Modifier = Modifier) {
+    Box(
+        modifier
+            .padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
+            .fillMaxWidth()
+            .height(2.dp)
+            .clip(CircleShape)
+            .background(Brush.horizontalGradient(BrandGradient)),
+    )
+}
 
 @Composable
 fun alertColor(alert: AlertEntity): Color {

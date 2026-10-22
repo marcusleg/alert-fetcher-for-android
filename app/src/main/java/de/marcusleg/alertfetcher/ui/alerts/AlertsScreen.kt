@@ -68,6 +68,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.marcusleg.alertfetcher.data.AlertEntity
 import de.marcusleg.alertfetcher.model.AlertStatus
 import de.marcusleg.alertfetcher.model.Severity
+import de.marcusleg.alertfetcher.ui.components.BrandRule
 import de.marcusleg.alertfetcher.ui.components.LabelChip
 import de.marcusleg.alertfetcher.ui.components.Pill
 import de.marcusleg.alertfetcher.ui.components.alertColor
@@ -90,25 +91,28 @@ fun AlertsScreen(
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
-                title = { Text("Alerts") },
-                scrollBehavior = scrollBehavior,
-                actions = {
-                    IconButton(onClick = { menuOpen = true }) { Icon(Icons.Outlined.MoreVert, contentDescription = "More") }
-                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                        DropdownMenuItem(
-                            text = { Text("Acknowledge all firing") },
-                            leadingIcon = { Icon(Icons.Outlined.DoneAll, null) },
-                            onClick = { viewModel.acknowledgeAllFiring(); menuOpen = false },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Clear resolved") },
-                            leadingIcon = { Icon(Icons.Outlined.DeleteSweep, null) },
-                            onClick = { viewModel.clearResolved(); menuOpen = false },
-                        )
-                    }
-                },
-            )
+            Column {
+                TopAppBar(
+                    title = { Text("Alerts") },
+                    scrollBehavior = scrollBehavior,
+                    actions = {
+                        IconButton(onClick = { menuOpen = true }) { Icon(Icons.Outlined.MoreVert, contentDescription = "More") }
+                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Acknowledge all firing") },
+                                leadingIcon = { Icon(Icons.Outlined.DoneAll, null) },
+                                onClick = { viewModel.acknowledgeAllFiring(); menuOpen = false },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Clear resolved") },
+                                leadingIcon = { Icon(Icons.Outlined.DeleteSweep, null) },
+                                onClick = { viewModel.clearResolved(); menuOpen = false },
+                            )
+                        }
+                    },
+                )
+                BrandRule()
+            }
         },
     ) { padding ->
         PullToRefreshBox(

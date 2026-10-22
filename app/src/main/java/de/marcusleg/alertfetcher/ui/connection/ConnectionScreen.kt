@@ -84,6 +84,7 @@ import de.marcusleg.alertfetcher.data.AuthMode
 import de.marcusleg.alertfetcher.data.CheckEntity
 import de.marcusleg.alertfetcher.data.OidcTokenType
 import de.marcusleg.alertfetcher.ui.alerts.rememberTicker
+import de.marcusleg.alertfetcher.ui.components.BrandRule
 import de.marcusleg.alertfetcher.ui.components.ChoiceRow
 import de.marcusleg.alertfetcher.ui.components.CodeBlock
 import de.marcusleg.alertfetcher.ui.components.CopyButton
@@ -106,7 +107,12 @@ fun ConnectionScreen(viewModel: ConnectionViewModel) {
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
-        topBar = { TopAppBar(title = { Text("Connection") }) },
+        topBar = {
+            Column {
+                TopAppBar(title = { Text("Connection") })
+                BrandRule()
+            }
+        },
     ) { padding ->
         if (state.loading) return@Scaffold
         val settings = state.settings

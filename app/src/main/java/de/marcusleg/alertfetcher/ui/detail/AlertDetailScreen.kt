@@ -69,6 +69,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.marcusleg.alertfetcher.data.AlertEntity
 import de.marcusleg.alertfetcher.model.AlertStatus
 import de.marcusleg.alertfetcher.ui.alerts.rememberTicker
+import de.marcusleg.alertfetcher.ui.components.BrandRule
 import de.marcusleg.alertfetcher.ui.components.Pill
 import de.marcusleg.alertfetcher.ui.components.SectionCard
 import de.marcusleg.alertfetcher.ui.components.alertColor
@@ -98,17 +99,20 @@ fun AlertDetailScreen(viewModel: AlertDetailViewModel, onBack: () -> Unit) {
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
-            TopAppBar(
-                title = { Text("Alert details") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back") }
-                },
-                actions = {
-                    if (state.alert != null) {
-                        IconButton(onClick = { deleteDialog = true }) { Icon(Icons.Outlined.Delete, contentDescription = "Delete") }
-                    }
-                },
-            )
+            Column {
+                TopAppBar(
+                    title = { Text("Alert details") },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back") }
+                    },
+                    actions = {
+                        if (state.alert != null) {
+                            IconButton(onClick = { deleteDialog = true }) { Icon(Icons.Outlined.Delete, contentDescription = "Delete") }
+                        }
+                    },
+                )
+                BrandRule()
+            }
         },
     ) { padding ->
         val alert = state.alert
