@@ -285,6 +285,10 @@ git push origin v0.2.0
 
 The release fails if the tag doesn't match `appVersion`.
 
+### Dependency updates
+
+[Dependabot](.github/dependabot.yml) checks the Gradle dependencies and the GitHub Actions weekly. [Patch and minor updates](.github/workflows/dependabot-auto-merge.yml) are squash-merged automatically once the `build` check passes; a repository ruleset on `main` requires that check, with a bypass for admins so they can still push directly. Major updates wait for review.
+
 ### Project layout
 
 ```
