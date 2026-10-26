@@ -63,10 +63,7 @@ class ConnectionViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     fun checkNow() {
-        viewModelScope.launch {
-            if (container.settingsRepository.current().monitoringEnabled) container.monitorController.checkNow()
-            else container.poller.poll()
-        }
+        container.monitorController.checkNow()
     }
 
     fun testConnection() {

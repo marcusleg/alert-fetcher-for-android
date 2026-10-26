@@ -32,8 +32,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        // Brings the service back if the system killed it while the app was in the background.
-        lifecycleScope.launch { container.monitorController.ensureRunningIfEnabled() }
+        // Re-arms the check alarm, which a force stop cancels, and catches up on an overdue check.
+        lifecycleScope.launch { container.monitorController.resume() }
     }
 
     override fun onNewIntent(intent: Intent) {

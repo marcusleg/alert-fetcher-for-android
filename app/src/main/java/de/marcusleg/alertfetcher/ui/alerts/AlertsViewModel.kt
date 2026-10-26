@@ -60,11 +60,8 @@ class AlertsViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     fun refresh() {
-        viewModelScope.launch {
-            // While monitoring is off a manual refresh still checks once.
-            if (container.settingsRepository.current().monitoringEnabled) container.monitorController.checkNow()
-            else container.poller.poll()
-        }
+        // While monitoring is off a manual refresh still checks once.
+        container.monitorController.checkNow()
     }
 
     fun clearResolved() {

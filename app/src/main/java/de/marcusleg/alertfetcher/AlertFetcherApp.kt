@@ -9,16 +9,13 @@ import de.marcusleg.alertfetcher.auth.OidcManager
 import de.marcusleg.alertfetcher.data.AlertRepository
 import de.marcusleg.alertfetcher.data.AppDatabase
 import de.marcusleg.alertfetcher.data.SettingsRepository
+import de.marcusleg.alertfetcher.monitor.MonitorController
 import de.marcusleg.alertfetcher.monitor.PollScheduler
-import de.marcusleg.alertfetcher.monitor.PollTrigger
 import de.marcusleg.alertfetcher.monitor.Poller
 import de.marcusleg.alertfetcher.notify.AlertNotifier
-import de.marcusleg.alertfetcher.service.MonitorController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 
 class AlertFetcherApp : Application() {
@@ -32,6 +29,7 @@ class AlertFetcherApp : Application() {
         container.scope.launch {
             container.alertRepository.applyRetention(container.settingsRepository.current().retentionDays)
         }
+        container.scope.launch { container.monitorController.recheckOnSettingsChange() }
     }
 }
 
@@ -47,11 +45,9 @@ class AppContainer(context: Context) {
     val oidc = OidcManager(appContext, settingsRepository)
     val api = AlertmanagerApi(RequestAuthenticator(oidc))
 
-    /** Wakes the service's poll loop; see [de.marcusleg.alertfetcher.service.MonitorService]. */
-    val pollTriggers = Channel<PollTrigger>(capacity = 4, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     val pollScheduler = PollScheduler(appContext)
     val poller by lazy { Poller(appContext, settingsRepository, api, alertRepository, notifier) }
-    val monitorController by lazy { MonitorController(appContext, settingsRepository, pollScheduler, pollTriggers) }
+    val monitorController by lazy { MonitorController(scope, settingsRepository, poller, pollScheduler) }
     val silenceManager by lazy {
         SilenceManager(api, settingsRepository, alertRepository, notifier, oidc, onSilenced = monitorController::checkNow)
     }

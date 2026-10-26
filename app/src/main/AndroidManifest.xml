@@ -6,8 +6,6 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- Optional: lets checks run on time while the phone sleeps. Granted by the user in system settings. -->
@@ -37,17 +35,8 @@
             </intent-filter>
         </activity>
 
-        <service
-            android:name=".service.MonitorService"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Periodically checks the user's own Prometheus Alertmanager for firing alerts and raises notifications for them." />
-        </service>
-
         <receiver
-            android:name=".service.BootReceiver"
+            android:name=".monitor.BootReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
@@ -62,6 +51,10 @@
 
         <receiver
             android:name=".monitor.PollAlarmReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".monitor.NetworkAvailableReceiver"
             android:exported="false" />
     </application>
 </manifest>

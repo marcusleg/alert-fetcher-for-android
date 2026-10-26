@@ -51,7 +51,7 @@ Because the phone only makes outgoing HTTPS requests:
   - **OpenID Connect**: sign in with any standards-compliant provider such as Keycloak, Authentik, Authelia, Zitadel or Dex (authorization code flow with PKCE in a browser tab, so the app never sees your password). Tokens are refreshed in the background. Tested with Dex and oauth2-proxy.
   - **Basic auth** or a static **bearer token**.
   - **Additional request headers**, e.g. Cloudflare Access service tokens.
-- **Configurable check interval**: 1 minute to 1 hour, 5 minutes by default. A foreground service and wake-up alarms keep checks running while the phone sleeps.
+- **Configurable check interval**: 1 minute to 1 hour, 5 minutes by default. Wake-up alarms keep checks running while the phone sleeps, without a persistent notification.
 - **Notifications by severity**: separate channels for Critical, Warning, Info and Resolved. Each can have its own sound, vibration and Do Not Disturb override.
   - New alerts notify once; unchanged alerts stay quiet.
   - Resolved alerts replace the firing notification with a quiet "resolved" one, or remove it.
@@ -191,8 +191,8 @@ spec:
 ## Checks, battery and reliability
 
 - The **check interval** (1 minute to 1 hour, default 5 minutes) is the longest it takes for a new alert to reach you. Each check is a single small HTTPS request.
-- A **foreground service** keeps the app running, and an **alarm** wakes the phone for each check. Without the *Alarms & reminders* permission, Android may delay checks by a few minutes while the phone sleeps.
-- **Disable battery optimization** for the app. On some vendors (Xiaomi, Huawei, Samsung, OnePlus…) also check [dontkillmyapp.com](https://dontkillmyapp.com).
+- An **alarm** wakes the app for each check; nothing keeps running in between, so there is no persistent notification. Without the *Alarms & reminders* permission, Android may delay checks by a few minutes while the phone sleeps.
+- **Disable battery optimization** for the app. Otherwise Android may cut a check's network access short while the phone sleeps, and space the checks out further. On some vendors (Xiaomi, Huawei, Samsung, OnePlus…) also check [dontkillmyapp.com](https://dontkillmyapp.com).
 - When checks fail while the phone is online, the app warns after **Warn when unreachable for** (15 minutes by default, at least two missed checks). The **Recent checks** log on the Connection tab shows each check's result and error.
 - After the network comes back, the app checks immediately instead of waiting for the next interval.
 
@@ -296,8 +296,7 @@ app/src/main/java/de/marcusleg/alertfetcher/
 ├── model/          Alertmanager API v2 models (kotlinx.serialization), severity, fingerprints
 ├── alertmanager/   HTTPS API client, request authentication, silences
 ├── auth/           OpenID Connect sign-in and token refresh (AppAuth)
-├── monitor/        Poller, check scheduling (AlarmManager), connection and heartbeat health
-├── service/        Foreground service, boot receiver
+├── monitor/        Poller, check scheduling (AlarmManager), boot receiver, connection and heartbeat health
 ├── data/           Room database (alerts, check log), DataStore settings
 ├── notify/         Notification channels, per-alert notifications, actions
 ├── util/           Config snippets, time formatting

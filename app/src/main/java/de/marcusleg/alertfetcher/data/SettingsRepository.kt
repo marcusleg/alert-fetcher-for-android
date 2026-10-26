@@ -84,6 +84,8 @@ data class MonitorState(
     /** When heartbeat monitoring was switched on; the reference until the first heartbeat is seen. */
     val heartbeatArmedAt: Long? = null,
     val heartbeatMissingNotified: Boolean = false,
+    /** A reboot or app update cleared the notifications; the next successful check restores them. */
+    val restoreNotifications: Boolean = false,
 ) {
     val lastCheckFailed: Boolean get() = consecutiveFailures > 0
 }

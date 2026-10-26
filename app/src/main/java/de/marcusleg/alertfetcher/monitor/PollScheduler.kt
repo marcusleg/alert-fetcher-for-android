@@ -5,24 +5,19 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.os.Build
 import android.os.PowerManager
 import android.util.Log
 import de.marcusleg.alertfetcher.container
-import de.marcusleg.alertfetcher.service.MonitorService
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
-
-enum class PollTrigger {
-    /** The poll interval elapsed (alarm). Ignored if a check just ran. */
-    SCHEDULED,
-    /** User request, settings change or the network came back. Always checks. */
-    NOW,
-}
 
 /**
- * Wakes the device for the next check. The service's own timer stops while the CPU sleeps (Doze),
- * so an alarm is what actually keeps the interval.
+ * Wakes the app for each check with an alarm, which also fires while the phone sleeps (Doze) and after the
+ * process was killed.
  */
 class PollScheduler(private val context: Context) {
     private val alarmManager = context.getSystemService(AlarmManager::class.java)
@@ -32,7 +27,7 @@ class PollScheduler(private val context: Context) {
         Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
 
     fun scheduleAt(at: Long) {
-        val intent = pendingIntent()
+        val intent = alarmIntent()
         if (canScheduleExact()) {
             alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, intent)
         } else {
@@ -41,45 +36,64 @@ class PollScheduler(private val context: Context) {
         }
     }
 
-    fun cancel() = alarmManager.cancel(pendingIntent())
+    fun cancel() = alarmManager.cancel(alarmIntent())
 
-    private fun pendingIntent(): PendingIntent = PendingIntent.getBroadcast(
+    /**
+     * Delivers [NetworkAvailableReceiver] once a network connects, even if the process isn't running. Android
+     * delivers it once and then drops the request; it is delivered right away if a network is already connected.
+     */
+    fun watchNetwork() {
+        val request = NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build()
+        // Registering the same PendingIntent again replaces the earlier request.
+        runCatching { context.getSystemService(ConnectivityManager::class.java)?.registerNetworkCallback(request, networkIntent()) }
+            .onFailure { Log.w("PollScheduler", "Could not watch the network", it) }
+    }
+
+    fun unwatchNetwork() {
+        runCatching { context.getSystemService(ConnectivityManager::class.java)?.unregisterNetworkCallback(networkIntent()) }
+    }
+
+    private fun alarmIntent() = broadcast(PollAlarmReceiver::class.java)
+
+    private fun networkIntent() = broadcast(NetworkAvailableReceiver::class.java)
+
+    private fun broadcast(receiver: Class<out BroadcastReceiver>): PendingIntent = PendingIntent.getBroadcast(
         context,
         0,
-        Intent(context, PollAlarmReceiver::class.java),
+        Intent(context, receiver),
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
 }
 
 class PollAlarmReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent) {
-        // The alarm only keeps the CPU awake during onReceive; bridge the gap until the service takes its own lock.
-        val power = context.getSystemService(PowerManager::class.java)
-        power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "AlertFetcher:alarm").acquire(BRIDGE_WAKE_LOCK_MS)
-        val container = context.container
-        if (MonitorService.isRunning) {
-            container.pollTriggers.trySend(PollTrigger.SCHEDULED)
-            return
-        }
-        // The process was killed; the service checks right away when it starts.
-        val pending = goAsync()
-        container.scope.launch {
-            try {
-                if (!container.monitorController.ensureRunningIfEnabled()) return@launch
-            } catch (e: Exception) {
-                // Background service starts can be refused (no exact alarm permission, battery optimized).
-                // Check inline at least, within the broadcast's time budget.
-                Log.w("PollAlarmReceiver", "Could not start the monitor service", e)
-                withTimeoutOrNull(INLINE_POLL_TIMEOUT_MS) { container.poller.poll() }
-                container.pollScheduler.scheduleAt(System.currentTimeMillis() + container.settingsRepository.current().pollIntervalMillis)
-            } finally {
-                pending.finish()
-            }
-        }
-    }
+    override fun onReceive(context: Context, intent: Intent) = runCheck(context, "alarm") { it.checkIfDue() }
+}
 
-    private companion object {
-        const val BRIDGE_WAKE_LOCK_MS = 10_000L
-        const val INLINE_POLL_TIMEOUT_MS = 8_000L
+class NetworkAvailableReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) = runCheck(context, "network") { it.checkAfterReconnect() }
+}
+
+/**
+ * Runs a check past onReceive, keeping the CPU awake until it's done. The HTTP timeouts keep it well within
+ * the time Android gives a background broadcast.
+ */
+private fun BroadcastReceiver.runCheck(context: Context, reason: String, check: suspend (MonitorController) -> Unit) {
+    val lock = context.getSystemService(PowerManager::class.java).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "AlertFetcher:$reason")
+    lock.acquire(CHECK_WAKE_LOCK_MS)
+    val pending = goAsync()
+    val container = context.container
+    container.scope.launch {
+        try {
+            check(container.monitorController)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w("PollScheduler", "Check after $reason failed", e)
+        } finally {
+            if (lock.isHeld) lock.release()
+            pending.finish()
+        }
     }
 }
+
+private const val CHECK_WAKE_LOCK_MS = 2 * 60_000L

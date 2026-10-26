@@ -47,11 +47,10 @@ class AlertNotifier(private val context: Context) {
             channel(CHANNEL_HEALTH, R.string.channel_health, R.string.channel_health_desc, NotificationManager.IMPORTANCE_HIGH, GROUP_SYSTEM) {
                 enableVibration(true)
             },
-            channel(CHANNEL_SERVICE, R.string.channel_service, R.string.channel_service_desc, NotificationManager.IMPORTANCE_LOW, GROUP_SYSTEM) {
-                setShowBadge(false)
-            },
         )
         nm.createNotificationChannels(channels)
+        // Belonged to the foreground service that versions up to 0.2.0 kept running.
+        nm.deleteNotificationChannel(LEGACY_CHANNEL_SERVICE)
     }
 
     private inline fun channel(
@@ -285,25 +284,6 @@ class AlertNotifier(private val context: Context) {
         postFresh(null, id, notification)
     }
 
-    fun serviceNotification(title: String, text: String?): Notification =
-        NotificationCompat.Builder(context, CHANNEL_SERVICE)
-            .setSmallIcon(R.drawable.ic_stat_service)
-            .setColor(ContextCompat.getColor(context, R.color.brand))
-            .setContentTitle(title)
-            .setContentText(text)
-            .setOngoing(true)
-            .setOnlyAlertOnce(true)
-            .setShowWhen(false)
-            .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-            .setContentIntent(openAlertIntent(null, MainActivity.DESTINATION_CONNECTION))
-            .addAction(
-                R.drawable.ic_stat_stop,
-                context.getString(R.string.action_stop),
-                NotificationActionReceiver.intent(context, NotificationActionReceiver.ACTION_STOP, null),
-            )
-            .build()
-
     private fun openAlertIntent(fingerprint: String?, destination: String? = null): PendingIntent {
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -320,13 +300,12 @@ class AlertNotifier(private val context: Context) {
         const val CHANNEL_INFO = "alerts_info"
         const val CHANNEL_RESOLVED = "alerts_resolved"
         const val CHANNEL_HEALTH = "monitoring_health"
-        const val CHANNEL_SERVICE = "monitor_service"
+        private const val LEGACY_CHANNEL_SERVICE = "monitor_service"
 
         private const val GROUP_ALERTS = "alerts"
         private const val GROUP_SYSTEM = "system"
         private const val GROUP_KEY = "de.marcusleg.alertfetcher.ALERTS"
 
-        const val ID_SERVICE = 1
         private const val ID_SUMMARY = 2
         private const val ID_HEARTBEAT = 3
         private const val ID_CONNECTION = 4

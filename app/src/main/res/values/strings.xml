@@ -14,12 +14,9 @@
     <string name="channel_resolved_desc">Alerts that stopped firing.</string>
     <string name="channel_health">Monitoring problems</string>
     <string name="channel_health_desc">Warns when Alertmanager can\'t be reached, sign-in is required, or the heartbeat alert is missing.</string>
-    <string name="channel_service">Monitoring status</string>
-    <string name="channel_service_desc">Persistent notification shown while Alertmanager is being monitored.</string>
 
     <string name="action_acknowledge">Acknowledge</string>
     <string name="action_silence_1h">Silence 1h</string>
-    <string name="action_stop">Stop monitoring</string>
 
     <string name="notification_resolved_title">Resolved: %1$s</string>
     <plurals name="summary_firing">
@@ -44,18 +41,6 @@
     <string name="health_auth_title">Alertmanager sign-in required</string>
     <string name="health_auth_text">The credentials were rejected. Open the app to fix the connection.</string>
     <string name="health_restored_title">Alertmanager reachable again</string>
-
-    <string name="service_title_starting">Connecting to Alertmanager…</string>
-    <string name="service_title_not_configured">Set up the Alertmanager connection</string>
-    <string name="service_title_auth">Sign-in required</string>
-    <string name="service_title_failing">Can\'t reach Alertmanager</string>
-    <string name="service_title_ok">Monitoring %1$s</string>
-    <string name="service_text_ok">%1$s · checked at %2$s</string>
-    <plurals name="service_firing">
-        <item quantity="zero">Nothing firing</item>
-        <item quantity="one">%1$d firing alert</item>
-        <item quantity="other">%1$d firing alerts</item>
-    </plurals>
 
     <string name="silence_created">Silence created in Alertmanager</string>
     <string name="silence_failed">Silence failed: %1$s</string>

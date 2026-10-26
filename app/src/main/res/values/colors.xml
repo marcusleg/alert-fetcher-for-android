@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Notification accents; kept in sync with the light theme in ui/theme/Theme.kt -->
-    <color name="brand">#7143BE</color>
     <color name="severity_critical">#D9005E</color>
     <color name="severity_warning">#A35D00</color>
     <color name="severity_info">#00798A</color>

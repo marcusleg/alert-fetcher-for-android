@@ -34,8 +34,6 @@ class Poller(
 ) {
     private val mutex = Mutex()
 
-    /** Notifications don't survive a reboot or app update; the first check of a process restores them. */
-    private var restoreNotifications = true
     private val _polling = MutableStateFlow(false)
     val polling: StateFlow<Boolean> = _polling.asStateFlow()
 
@@ -48,11 +46,10 @@ class Poller(
         try {
             val alerts = api.alerts(settings)
             val result = alertRepository.sync(alerts, settings, startedAt)
-            notifier.handle(result.updates, settings, restoreMissing = restoreNotifications)
-            restoreNotifications = false
+            notifier.handle(result.updates, settings, restoreMissing = settingsRepository.currentMonitorState().restoreNotifications)
             var outcome: HealthOutcome? = null
             settingsRepository.updateMonitorState { state ->
-                Health.onSuccess(state, settings, clock(), result.heartbeatSeen).also { outcome = it }.state
+                Health.onSuccess(state, settings, clock(), result.heartbeatSeen).also { outcome = it }.state.copy(restoreNotifications = false)
             }
             outcome?.let { notifier.handleHealth(it.events, it.state, settings) }
         } catch (e: CancellationException) {
@@ -72,7 +69,7 @@ class Poller(
         true
     }
 
-    private fun isOnline(): Boolean {
+    fun isOnline(): Boolean {
         val connectivity = context.getSystemService(ConnectivityManager::class.java) ?: return true
         val network = connectivity.activeNetwork ?: return false
         return connectivity.getNetworkCapabilities(network)?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
