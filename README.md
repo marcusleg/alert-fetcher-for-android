@@ -283,7 +283,7 @@ git tag -a v0.2.0 -m "Alert Fetcher 0.2.0" -m "- What changed"
 git push origin v0.2.0
 ```
 
-The release fails if the tag doesn't match `appVersion`.
+The release fails if the tag doesn't match `appVersion`. Versions with a suffix such as `0.3.0-alpha.0`, `-beta.1` or `-rc.2` are published as pre-releases, and their version codes sort before the final release.
 
 ### Dependency updates
 

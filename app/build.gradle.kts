@@ -20,8 +20,17 @@ fun signingValue(key: String, env: String): String? =
 
 // The version lives in gradle.properties; release tags must be v<appVersion>.
 val appVersion = providers.gradleProperty("appVersion").get()
-val appVersionCode = appVersion.split(".").map(String::toInt).let { (major, minor, patch) ->
-    major * 10_000 + minor * 100 + patch
+// Two digits per version part, plus two for pre-releases so that they sort before the final release:
+// 1.2.3-alpha.4 → 1020304, 1.2.3-beta.4 → 1020334, 1.2.3-rc.4 → 1020364, 1.2.3 → 1020399.
+val appVersionCode = run {
+    val match = Regex("""(\d+)\.(\d+)\.(\d+)(?:-(alpha|beta|rc)\.(\d+))?""").matchEntire(appVersion)
+        ?: error("appVersion must look like 1.2.3 or 1.2.3-alpha.4 (or -beta.4, -rc.4), not $appVersion")
+    val (major, minor, patch, stage, number) = match.destructured
+    val preRelease = when (stage) {
+        "" -> 99
+        else -> listOf("alpha", "beta", "rc").indexOf(stage) * 30 + number.toInt().also { require(it < 30) { "Pre-release number must be below 30" } }
+    }
+    ((major.toInt() * 100 + minor.toInt()) * 100 + patch.toInt()) * 100 + preRelease
 }
 
 android {
