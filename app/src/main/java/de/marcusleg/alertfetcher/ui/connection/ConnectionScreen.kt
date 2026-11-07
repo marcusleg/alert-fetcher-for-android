@@ -431,12 +431,14 @@ private fun SetupCard(settings: AppSettings) {
     val tabs = buildList {
         add("Route")
         add("Kubernetes")
+        add("Short alerts")
         if (settings.authMode == AuthMode.OIDC) add("oauth2-proxy")
     }
     val selected = tab.coerceAtMost(tabs.lastIndex)
     val snippet = when (tabs[selected]) {
         "Route" -> ConfigSnippets.alertmanagerRoute(settings)
         "Kubernetes" -> ConfigSnippets.alertmanagerConfigCrd(settings)
+        "Short alerts" -> ConfigSnippets.keepFiringRule(settings)
         else -> ConfigSnippets.oauth2ProxyArgs(settings)
     }
     SectionCard(
@@ -464,6 +466,9 @@ private fun SetupCard(settings: AppSettings) {
                 "Kubernetes" -> "Optional, for prometheus-operator. The operator prefixes the receiver name with namespace and " +
                     "resource name, so filter on \"monitoring/<name>/<name>\". It also only matches alerts from that " +
                     "namespace unless alertmanagerConfigMatcherStrategy is None."
+                "Short alerts" -> "Optional. Alertmanager only returns active alerts, so an alert that starts and ends between " +
+                    "two checks is missed. Add keep_firing_for to the rules you can't miss (PrometheusRule resources use the " +
+                    "same field). Their resolved notifications arrive later by the same amount."
                 else -> "Lets oauth2-proxy accept the app's tokens as bearer tokens. Select \"ID token\" above unless your " +
                     "provider puts the client ID into the access token's audience."
             },

@@ -5,6 +5,7 @@ import de.marcusleg.alertfetcher.data.AppSettings
 /** Copy-paste configuration for the server side. */
 object ConfigSnippets {
     const val DEFAULT_RECEIVER = "phone"
+    private const val MIN_KEEP_FIRING_MINUTES = 10
 
     private fun receiverName(settings: AppSettings): String =
         settings.receiverFilterSet.firstOrNull()?.substringAfterLast('/') ?: DEFAULT_RECEIVER
@@ -47,6 +48,21 @@ object ConfigSnippets {
             appendLine("    continue: true")
             appendLine("  receivers:")
             appendLine("    - name: $name")
+        }.trimEnd()
+    }
+
+    /**
+     * Alertmanager only returns active alerts, so an alert that starts and ends between two checks is missed unless
+     * Prometheus keeps it firing until the next one. Android can space out checks while the phone sleeps, hence the minimum.
+     */
+    fun keepFiringRule(settings: AppSettings): String {
+        val minutes = maxOf(MIN_KEEP_FIRING_MINUTES, settings.pollIntervalMinutes * 2)
+        return buildString {
+            appendLine("# In your Prometheus alerting rules: keep a short alert firing")
+            appendLine("# until the app's next check, even if its condition has cleared.")
+            appendLine("- alert: HighErrorRate")
+            appendLine("  expr: job:request_errors:rate5m > 0.05")
+            appendLine("  keep_firing_for: ${minutes}m")
         }.trimEnd()
     }
 

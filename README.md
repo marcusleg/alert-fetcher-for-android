@@ -53,7 +53,7 @@ Because the phone only makes outgoing HTTPS requests:
   - **Additional request headers**, e.g. Cloudflare Access service tokens.
 - **Configurable check interval**: 1 minute to 1 hour, 5 minutes by default. Wake-up alarms keep checks running while the phone sleeps, without a persistent notification.
 - **Notifications by severity**: separate channels for Critical, Warning, Info and Resolved. Each can have its own sound, vibration and Do Not Disturb override.
-  - New alerts notify once; unchanged alerts stay quiet.
+  - New alerts notify once; unchanged alerts stay quiet. An alert that resolved and fired again between two checks notifies again.
   - Resolved alerts replace the firing notification with a quiet "resolved" one, or remove it.
   - Alerts silenced or inhibited in Alertmanager don't notify, and notify again when the silence runs out.
   - Notification actions: **Acknowledge** and **Silence 1h**.
@@ -195,6 +195,23 @@ spec:
 - **Disable battery optimization** for the app. Otherwise Android may cut a check's network access short while the phone sleeps, and space the checks out further. On some vendors (Xiaomi, Huawei, Samsung, OnePlus…) also check [dontkillmyapp.com](https://dontkillmyapp.com).
 - When checks fail while the phone is online, the app warns after **Warn when unreachable for** (15 minutes by default, at least two missed checks). The **Recent checks** log on the Connection tab shows each check's result and error.
 - After the network comes back, the app checks immediately instead of waiting for the next interval.
+
+### Alerts shorter than the check interval
+
+Alertmanager's API only returns active alerts and has no history, so **an alert that starts and ends between two checks never reaches the app**. The same goes for alerts that come and go while the phone can't reach Alertmanager.
+
+To catch short alerts, add [`keep_firing_for`](https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/) (Prometheus 2.42 or newer) to the rules you can't miss. Prometheus then keeps the alert firing for that long after its condition clears, so it is still there at the next check:
+
+```yaml
+- alert: HighErrorRate
+  expr: job:request_errors:rate5m > 0.05
+  keep_firing_for: 10m
+```
+
+- Use a duration well above the check interval, because Android can space out checks while the phone sleeps. **Connection › Server-side setup › Short alerts** suggests a value for your interval.
+- `PrometheusRule` resources use the same `keep_firing_for` field.
+- Resolved notifications arrive later by the same amount, and flapping alerts stay firing instead of notifying repeatedly.
+- Outages longer than this duration can still hide an alert.
 
 ## Heartbeat (dead man's switch)
 

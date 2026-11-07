@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.Flow
 enum class AlertChange {
     /** Never seen before and firing. */
     NEW_FIRING,
-    /** Was resolved, fires again. */
+    /** Was resolved, fires again. Also when that happened between two checks, which shows as a later startsAt. */
     REFIRED,
     /** Was silenced or inhibited in Alertmanager and no longer is. */
     UNSUPPRESSED,
@@ -155,8 +155,13 @@ class AlertRepository(
             now: Long,
         ): Pair<AlertEntity, AlertChange> {
             val status = if (incoming.isSuppressed) AlertStatus.SUPPRESSED else AlertStatus.FIRING
-            val change = AlertChange.classify(existing?.status, status)
-            val newEpisode = existing == null || existing.status == AlertStatus.RESOLVED
+            val startsAt = Rfc3339.parseMillis(incoming.startsAt)
+            // While an alert stays active Alertmanager keeps its earliest startsAt, so only a later one means it
+            // resolved and fired again since the last check. An earlier one just comes from another Prometheus replica.
+            val restarted = existing?.startsAt != null && startsAt != null && startsAt > existing.startsAt
+            val classified = AlertChange.classify(existing?.status, status)
+            val change = if (classified == AlertChange.STILL_FIRING && restarted) AlertChange.REFIRED else classified
+            val newEpisode = existing == null || existing.status == AlertStatus.RESOLVED || change == AlertChange.REFIRED
             // A silence that ran out (or an inhibition that ended) deserves a fresh notification.
             val resetUserState = newEpisode || change == AlertChange.UNSUPPRESSED
             val entity = AlertEntity(
@@ -166,7 +171,7 @@ class AlertRepository(
                 severity = Severity.fromLabel(incoming.labels["severity"]),
                 labels = incoming.labels,
                 annotations = incoming.annotations,
-                startsAt = Rfc3339.parseMillis(incoming.startsAt),
+                startsAt = startsAt,
                 // For active alerts Alertmanager's endsAt is only an expiry estimate.
                 endsAt = null,
                 generatorUrl = incoming.generatorURL.ifBlank { null },
@@ -176,7 +181,7 @@ class AlertRepository(
                 inhibitedBy = incoming.status.inhibitedBy,
                 firstSeenAt = if (newEpisode) now else existing.firstSeenAt,
                 lastSeenAt = now,
-                statusChangedAt = if (existing == null || existing.status != status) now else existing.statusChangedAt,
+                statusChangedAt = if (existing == null || existing.status != status || change == AlertChange.REFIRED) now else existing.statusChangedAt,
                 acknowledged = if (resetUserState) false else existing.acknowledged,
                 silencedUntil = if (resetUserState) null else existing.silencedUntil,
             )

@@ -24,6 +24,13 @@ class ConfigSnippetsTest {
     }
 
     @Test
+    fun `keep_firing_for outlasts the check interval`() {
+        assertTrue(ConfigSnippets.keepFiringRule(AppSettings(pollIntervalMinutes = 1)).contains("keep_firing_for: 10m"))
+        assertTrue(ConfigSnippets.keepFiringRule(AppSettings(pollIntervalMinutes = 5)).contains("keep_firing_for: 10m"))
+        assertTrue(ConfigSnippets.keepFiringRule(AppSettings(pollIntervalMinutes = 30)).contains("keep_firing_for: 60m"))
+    }
+
+    @Test
     fun `oauth2-proxy args contain issuer and client`() {
         val args = ConfigSnippets.oauth2ProxyArgs(AppSettings(oidcIssuer = " https://sso.lan/ ", oidcClientId = "af"))
         assertTrue(args.contains("--skip-jwt-bearer-tokens=true"))

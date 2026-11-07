@@ -98,6 +98,40 @@ class AlertMergeTest {
     }
 
     @Test
+    fun `later startsAt means the alert resolved and fired again between two checks`() {
+        val (first, _) = AlertRepository.merge(null, firing, fp, url, now = 1_000)
+        val restarted = firing.copy(startsAt = "2026-10-21T10:03:30Z")
+        val (refired, change) = AlertRepository.merge(first.copy(acknowledged = true, silencedUntil = 9_000), restarted, fp, url, now = 5_000)
+        assertEquals(AlertChange.REFIRED, change)
+        assertEquals(java.time.Instant.parse("2026-10-21T10:03:30Z").toEpochMilli(), refired.startsAt)
+        assertFalse("a new episode should notify again", refired.acknowledged)
+        assertNull(refired.silencedUntil)
+        assertEquals(5_000, refired.firstSeenAt)
+        assertEquals(5_000, refired.statusChangedAt)
+    }
+
+    @Test
+    fun `earlier or missing startsAt is not a new episode`() {
+        val (first, _) = AlertRepository.merge(null, firing, fp, url, now = 1_000)
+        val acknowledged = first.copy(acknowledged = true)
+        for (startsAt in listOf("2026-10-21T09:50:00Z", null, "0001-01-01T00:00:00Z")) {
+            val (second, change) = AlertRepository.merge(acknowledged, firing.copy(startsAt = startsAt), fp, url, now = 5_000)
+            assertEquals(AlertChange.STILL_FIRING, change)
+            assertTrue(second.acknowledged)
+            assertEquals(1_000, second.firstSeenAt)
+        }
+        val unknownStart = acknowledged.copy(startsAt = null)
+        assertEquals(AlertChange.STILL_FIRING, AlertRepository.merge(unknownStart, firing, fp, url, now = 5_000).second)
+    }
+
+    @Test
+    fun `later startsAt on a suppressed alert stays quiet`() {
+        val (muted, _) = AlertRepository.merge(null, silenced, fp, url, now = 1_000)
+        val restarted = silenced.copy(startsAt = "2026-10-21T10:03:30Z")
+        assertEquals(AlertChange.STILL_SUPPRESSED, AlertRepository.merge(muted, restarted, fp, url, now = 5_000).second)
+    }
+
+    @Test
     fun `suppressed alert resolves quietly`() {
         val (muted, _) = AlertRepository.merge(null, silenced, fp, url, now = 1_000)
         val (_, change) = AlertRepository.resolve(muted, now = 2_000)
